@@ -1,0 +1,63 @@
+{
+  "id": "SampleSocialLine",
+  "name": "Sample: social post drafter (no gate)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0101-4000-8000-samplemanual1",
+      "name": "Every morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300],
+      "parameters": {"rule": {"interval": [{"field": "days", "triggerAtHour": 9}]}}
+    },
+    {
+      "id": "a1b2c3d4-0102-4000-8000-sampleopenai1",
+      "name": "Draft post with GPT",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [240, 300],
+      "parameters": {
+        "resource": "text", "operation": "message",
+        "modelId": {"__rl": true, "mode": "list", "value": "gpt-4o-mini", "cachedResultName": "gpt-4o-mini"},
+        "messages": {"values": [{"content": "Write a LinkedIn post about our new recycling schedule.", "role": "user"}]},
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0103-4000-8000-samplevoice01",
+      "name": "Voice-over (ElevenLabs)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "parameters": {
+        "method": "POST", "url": "https://api.elevenlabs.io/v1/text-to-speech/voice-id",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model_id: 'eleven_multilingual_v2', text: $json.message.content }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0104-4000-8000-samplepublsh1",
+      "name": "Publish to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [720, 300],
+      "parameters": {"text": "={{ $('Draft post with GPT').item.json.message.content }}", "additionalFields": {}}
+    },
+    {
+      "id": "a1b2c3d4-0105-4000-8000-samplenote001",
+      "name": "Why this is here",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 100],
+      "parameters": {"width": 900, "height": 110, "content": "## Sample line — deliberately without a human gate\nA typical marketing automation: model drafts, voice is generated, post goes out. Inactive, no credentials. It exists so the Transparency Kit's registry has something to flag: two AI systems, **no human gate**, published text with no disclosure step."}
+    }
+  ],
+  "connections": {
+    "Every morning": {"main": [[{"node": "Draft post with GPT", "type": "main", "index": 0}]]},
+    "Draft post with GPT": {"main": [[{"node": "Voice-over (ElevenLabs)", "type": "main", "index": 0}]]},
+    "Voice-over (ElevenLabs)": {"main": [[{"node": "Publish to LinkedIn", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

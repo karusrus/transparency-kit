@@ -1,0 +1,127 @@
+{
+  "id": "AiActAuditView00",
+  "name": "AI Act Transparency Kit — Audit view",
+  "nodes": [
+    {
+      "id": "93df1257-ec72-4937-b123-e82c9d734419",
+      "name": "Audit request (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "path": "audit",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "a1b2c3d4-0004-4000-8000-aiactaudit001"
+    },
+    {
+      "id": "a4c97d8e-9116-4a19-a0b3-9ab7d2628e3f",
+      "name": "Collect files",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "command": "echo '###REGISTRY'; [ -f /data/registry.json ] && cat /data/registry.json; echo; for s in MANIFESTS:manifests APPROVALS:approvals INBOX:inbox; do echo \"###${s%%:*}\"; for f in /data/${s#*:}/*.json; do [ -f \"$f\" ] && node -e 'process.stdout.write(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\")))+\"\\n\")' \"$f\"; done; done; true"
+      }
+    },
+    {
+      "id": "d3837667-c589-4b2f-bf5a-5c161d588895",
+      "name": "Render audit view",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Renders the auditor's page from the files the kit writes. Input: stdout of \"Collect files\".\nconst raw = String($input.first().json.stdout || '');\nconst sec = { REGISTRY: '', MANIFESTS: '', APPROVALS: '', INBOX: '' };\nlet cur = null;\nfor (const line of raw.split('\\n')) {\n  const m = line.match(/^###(REGISTRY|MANIFESTS|APPROVALS|INBOX)\\s*$/);\n  if (m) { cur = m[1]; continue; }\n  if (cur) sec[cur] += line + '\\n';\n}\nconst parseLines = (s) => s.split('\\n').map(l => l.trim()).filter(l => l.startsWith('{')).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);\nlet registry = null; try { registry = JSON.parse(sec.REGISTRY.trim()); } catch (e) {}\nconst manifests = parseLines(sec.MANIFESTS).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));\nconst inbox = parseLines(sec.INBOX).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));\nconst approvals = parseLines(sec.APPROVALS).sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)));\n\nconst esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst dt = (v) => v ? esc(String(v).replace('T', ' ').slice(0, 16)) : '';\nconst pill = (v) => {\n  const map = { approved: 'ok', disclosed: 'ok', editorial_exception: 'warn', not_required: 'muted', pending_review: 'warn', returned: 'bad', 'n/a': 'muted', internal: 'muted', editorial: 'warn', verify: 'warn', uncovered: 'bad', likeness: 'bad' };\n  return `<span class=\"pill ${map[v] || 'muted'}\">${esc(v)}</span>`;\n};\nconst table = (cols, rows) => rows.length\n  ? `<table><thead><tr>${cols.map(c => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`\n  : `<p class=\"empty\">Nothing recorded yet.</p>`;\n\nconst media = manifests.filter(m => m.asset_type !== 'text');\nconst texts = manifests.filter(m => m.asset_type === 'text');\nconst systems = registry && Array.isArray(registry.systems) ? registry.systems : [];\n\nconst blocks = [\n  {\n    n: 1, title: 'AI-systems registry', art: 'Art. 4 · deployer duties',\n    what: 'Every AI system on this n8n instance, with path analysis: from each node that calls a model, every path forward to a node that reaches people, and what stands in between. Plus every external generator declared at intake. Read from the instance, not typed by hand.',\n    body: table([\n      ['Status', r => pill(r.path_status)],\n      ['Workflow / line', r => esc(r.workflow) + (r.workflow_active === true ? ' <span class=\"pill ok\">active</span>' : r.workflow_active === false ? ' <span class=\"pill muted\">inactive</span>' : '')],\n      ['System (node)', r => esc(r.system) + (r.likeness ? ' <span class=\"pill warn\">face/voice</span>' : '')], ['Node type', r => `<code>${esc(r.node_type)}</code>`], ['Model', r => esc(r.model)],\n      ['Reaches people via', r => esc((r.exits || []).join(', '))],\n      ['Evidence (path)', r => `<span class=\"ev\">${esc(r.evidence)}</span>`],\n      ['Source', r => esc(r.source)], ['Assets', r => esc(r.assets || '')],\n    ], systems),\n    foot: registry ? `Generated ${dt(registry.generated_at)} · ${registry.instance_workflows || 0} workflows scanned: ${(registry.workflows_scanned || []).map(w => esc(w.name)).join(' · ')}<br>Rules: ${esc(registry.rules || '')}` : 'Registry file not written yet.',\n  },\n  {\n    n: 2, title: 'Synthetic media and deep fakes', art: 'Art. 50(4) §1 · Art. 50(2)',\n    what: 'Images, video and audio. A real person depicted means deep fake: visible disclosure plus consent on file. Provenance manifest for all of them.',\n    body: table([\n      ['ID', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)],\n      ['Real person', r => r.depicts_real_person ? 'yes' : 'no'], ['Consent', r => esc(r.consent_reference)],\n      ['Visible label', r => r.label_required ? `yes (${esc(r.label_basis)})` : 'no'], ['Model', r => esc(r.model + (r.model_version ? ' ' + r.model_version : ''))],\n      ['Prompt hash', r => `<code>${esc(String(r.prompt_sha256).slice(0, 12))}</code>`], ['Operator', r => esc(r.operator)],\n      ['Status', r => pill(r.disclosure_status || r.status)], ['Artefact', r => esc(r.labelled_path || r.incoming_path || '')],\n    ], media),\n  },\n  {\n    n: 3, title: 'Generated text', art: 'Art. 50(4) §2',\n    what: 'Text published to inform the public must say it is AI-generated, unless a named person exercised editorial control and holds responsibility. The gate records which of the two applies.',\n    body: table([\n      ['ID', r => `<code>${esc(r.id)}</code>`], ['Public information', r => r.public_information ? 'yes' : 'no'],\n      ['Disclosure', r => pill(r.disclosure_status || r.status)], ['Responsible person', r => esc(r.responsible_person || '')],\n      ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Decided', r => dt(r.decided_at)],\n      ['Text', r => `<details><summary>${esc(String(r.text_content || '').slice(0, 60))}…</summary><pre>${esc(r.disclosed_text || r.text_content)}</pre></details>`],\n    ], texts),\n  },\n  {\n    n: 4, title: 'Approval log', art: 'Art. 14 · Art. 12 (voluntary here)',\n    what: 'Who approved or returned what, when, and why. Human oversight as a property of the line. Logging is mandatory only for high-risk systems; this kit keeps it anyway.',\n    body: table([\n      ['Decided', r => dt(r.decided_at)], ['ID', r => `<code>${esc(r.id)}</code>`], ['Reviewer', r => esc(r.reviewer)],\n      ['Decision', r => esc(r.decision)], ['Outcome', r => pill(r.disclosure_status)], ['Reason', r => esc(r.reason || r.note || '')],\n      ['Artefact', r => esc(r.artefact)], ['Execution', r => `<code>${esc(r.execution_id)}</code>`],\n    ], approvals),\n  },\n];\n\nconst stat = (n, l) => `<div class=\"stat\"><b>${n}</b><span>${l}</span></div>`;\nconst html = `<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Audit view · AI Act Transparency Kit</title>\n<style>\n:root{--bg:#f6f7f9;--card:#fff;--ink:#14171c;--mut:#6b7280;--line:#e5e7eb;--acc:#1d4ed8;--ok:#0f766e;--warn:#b45309;--bad:#b91c1c}\n*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,Inter,Segoe UI,Roboto,sans-serif}\nheader{padding:28px 32px 12px}h1{margin:0 0 4px;font-size:22px}header p{margin:0;color:var(--mut)}\n.stats{display:flex;gap:12px;padding:8px 32px 20px;flex-wrap:wrap}.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:130px}\n.stat b{display:block;font-size:22px}.stat span{color:var(--mut);font-size:12px}\nmain{display:grid;gap:18px;padding:0 32px 40px}\nsection{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}\nsection>.hd{display:flex;align-items:baseline;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}\n.hd .n{width:28px;height:28px;border-radius:50%;background:var(--acc);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:600;flex:none}\n.hd h2{margin:0;font-size:16px}.hd .art{margin-left:auto;color:var(--acc);font-weight:600;white-space:nowrap}\n.what{padding:10px 18px;color:var(--mut);border-bottom:1px solid var(--line)}\n.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:8px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}\nth{font-weight:600;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}\ncode{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}pre{white-space:pre-wrap;margin:6px 0 0;font:12px ui-monospace,Menlo,monospace}\n.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}.pill.ok{background:#ccfbf1;color:var(--ok)}.pill.warn{background:#fef3c7;color:var(--warn)}.pill.bad{background:#fee2e2;color:var(--bad)}.pill.muted{background:#f3f4f6;color:var(--mut)}\n.empty{padding:14px 18px;color:var(--mut);margin:0}.ev{font-size:12px;color:var(--mut)}a{color:var(--acc)}.foot{padding:8px 18px;color:var(--mut);font-size:12px}\nfooter{padding:0 32px 40px;color:var(--mut);font-size:12px}\n</style></head><body>\n<header><h1>Audit view · AI Act Transparency Kit</h1><p>What the auditor reads instead of the pipeline. Deployer obligations under the EU AI Act, filled automatically by the line. Generated ${dt(new Date().toISOString())}.</p></header>\n<div class=\"stats\">${stat(systems.length, 'AI systems on the instance')}${stat(systems.filter(r => r.path_status === 'uncovered' || r.path_status === 'likeness').length, 'reach people uncovered')}${stat(systems.filter(r => r.path_status === 'editorial' || r.path_status === 'verify').length, 'need a decision')}${stat(media.length, 'synthetic media assets')}${stat(texts.length, 'generated texts')}${stat(approvals.length, 'decisions logged')}${stat(inbox.length, 'awaiting a human')}</div>\n<main>${inbox.length ? `<section><div class=\"hd\"><span class=\"n\">!</span><h2>Awaiting a human</h2><span class=\"art\">Art. 14 · the gate</span></div><p class=\"what\">Assets stopped at the gate. Open the link, decide, and the row moves to the approval log.</p><div class=\"wrap\">${table([['Since', r => dt(r.created_at)], ['Line', r => esc(r.line)], ['Asset', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)], ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Gate', r => `<a href=\"${esc(r.gate_url)}\">open the gate →</a>`]], inbox)}</div></section>` : ''}${blocks.map(b => `<section><div class=\"hd\"><span class=\"n\">${b.n}</span><h2>${esc(b.title)}</h2><span class=\"art\">${esc(b.art)}</span></div><p class=\"what\">${esc(b.what)}</p><div class=\"wrap\">${b.body}</div>${b.foot ? `<p class=\"foot\">${b.foot}</p>` : ''}</section>`).join('')}</main>\n<footer>Scope: deployer duties under Article 50 (in force 2 Aug 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed. Sources: files under /data written by the “AI Act Transparency Kit” workflow.</footer>\n</body></html>`;\nreturn [{ json: { html, systems: systems.length, manifests: manifests.length, approvals: approvals.length } }];"
+      }
+    },
+    {
+      "id": "18c5a63d-cb52-4855-8d5c-b0f2387603c0",
+      "name": "Respond HTML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "5e623bee-453e-4de3-87ef-09e8bde9aa50",
+      "name": "What this is",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        120
+      ],
+      "parameters": {
+        "width": 900,
+        "height": 100,
+        "content": "## Audit view — what an auditor reads instead of the pipeline\nAwaiting a human (gate links) · AI-systems registry with path analysis (Art. 4) · synthetic media & deepfakes (Art. 50(2), 50(4)) · generated public text (Art. 50(4) §2) · approval log (Art. 14, Art. 12 voluntary). Filled from files the kit writes; nothing here is typed by hand."
+      }
+    }
+  ],
+  "connections": {
+    "Audit request (GET)": {
+      "main": [
+        [
+          {
+            "node": "Collect files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect files": {
+      "main": [
+        [
+          {
+            "node": "Render audit view",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render audit view": {
+      "main": [
+        [
+          {
+            "node": "Respond HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

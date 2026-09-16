@@ -1,0 +1,319 @@
+{
+  "id": "RecyclingVoices1",
+  "name": "Recycling notice · three voices",
+  "nodes": [
+    {
+      "id": "b233bc1a-59ce-44fb-b593-3516369ab2ab",
+      "name": "Notice text",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "formTitle": "Recycling notice · three voices",
+        "formDescription": "Type the public notice. Kokoro reads it in three voices; every voice passes the AI Act gate before it is published.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Notice text",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Operator",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "path": "notice"
+        }
+      },
+      "webhookId": "a1b2c3d4-0201-4000-8000-hostnotice001"
+    },
+    {
+      "id": "f06d7a27-31fe-423e-88d6-d5da584662e7",
+      "name": "Three voices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// One item per voice. Fields the AI Act gate expects travel with the item (snake_case).\nconst f = $input.first().json;\nconst text = String(f['Notice text'] || '').trim();\nconst operator = String(f['Operator'] || 'unknown');\nconst stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');\nreturn ['af_bella', 'am_adam', 'bf_emma'].map(voice => ({ json: {\n  voice, text, notice_id: stamp,\n  asset_type: 'audio', language: 'en', model: 'Kokoro-82M', model_version: voice, prompt: text, operator,\n  depicts_real_person: 'no', consent_reference: '', public_information: 'yes',\n  caller_workflow: $workflow.name,\n} }));"
+      }
+    },
+    {
+      "id": "445c6d1c-8224-4be2-b933-6e9de0c3ffe7",
+      "name": "Kokoro TTS (local)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8880/tts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.text, voice: $json.voice, lang: 'en-us' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      }
+    },
+    {
+      "id": "3c304868-478c-43da-97cc-ebcfb0fd0779",
+      "name": "Attach fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// The HTTP node returns only the audio; put the item's fields back next to it, in order.\nconst src = $('Three voices').all();\nreturn $input.all().map((it, i) => {\n  const b = it.binary && it.binary.data ? it.binary.data : null;\n  if (b) b.fileName = `${src[i].json.notice_id}-${src[i].json.voice}.wav`;\n  return { json: { ...src[i].json }, binary: it.binary };\n});"
+      }
+    },
+    {
+      "id": "165ddc29-393c-4657-bab0-e6b6d36a0165",
+      "name": "One voice at a time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "c75d90fb-12a8-407a-b746-c361cc70cdef",
+      "name": "AI Act gate",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        460
+      ],
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "AiActTransparenc"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "788a94f3-e344-4c9d-a944-bfc4f8df9f0d",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3727920b-5819-4fcc-83bd-4c447de560c4",
+              "leftValue": "={{ $json.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7952b459-d562-4cc4-b762-b1a300da088b",
+      "name": "Prepare publish",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// One shell command that publishes every approved item (Buffer is not available in expressions, so this lives in Code).\nconst cmds = ['mkdir -p /data/published'];\nconst ids = [];\nfor (const it of $input.all()) {\n  const j = it.json;\n  if (!j.labelled_path) continue;\n  const rec = { id: j.id, published_at: new Date().toISOString(), file: '/data/published/' + String(j.labelled_path).split('/').pop(),\n                disclosure: j.disclosure_sentence, reviewer: j.reviewer, disclosure_status: j.disclosure_status };\n  const b64 = Buffer.from(JSON.stringify(rec, null, 2)).toString('base64');\n  cmds.push(`cp \"${j.labelled_path}\" /data/published/`, `printf %s ${b64} | base64 -d > /data/published/${j.id}.json`);\n  ids.push(j.id);\n}\nreturn [{ json: { published_ids: ids, publish_cmd: cmds.join(' && ') } }];"
+      }
+    },
+    {
+      "id": "e313d0ee-e925-43a9-a0de-0c388c60ccbe",
+      "name": "Publish to site [exit]",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        100
+      ],
+      "parameters": {
+        "command": "={{ $json.publish_cmd }}"
+      }
+    },
+    {
+      "id": "2135dc82-7706-4ef5-8156-95f06ee34c4f",
+      "name": "Returned, not published",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "acff4447-f7c4-4fea-8a25-c55d6884b99c",
+      "name": "What this line is",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "width": 1500,
+        "height": 110,
+        "content": "## A real production line with the kit as a module\nnotice → **Kokoro-82M**, three stock voices (local, no cloned person) → **AI Act gate** (Loop Over Items → Execute Sub-workflow, the parent waits for the human) → publish only what was approved. The publishing node is tagged `[exit]` so the registry knows it reaches people. Voices are stock, so this is `synthetic_media`, not a deep fake."
+      }
+    }
+  ],
+  "connections": {
+    "Notice text": {
+      "main": [
+        [
+          {
+            "node": "Three voices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Three voices": {
+      "main": [
+        [
+          {
+            "node": "Kokoro TTS (local)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kokoro TTS (local)": {
+      "main": [
+        [
+          {
+            "node": "Attach fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach fields": {
+      "main": [
+        [
+          {
+            "node": "One voice at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One voice at a time": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Act gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Act gate": {
+      "main": [
+        [
+          {
+            "node": "One voice at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Prepare publish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Returned, not published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare publish": {
+      "main": [
+        [
+          {
+            "node": "Publish to site [exit]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  }
+}

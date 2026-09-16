@@ -1,0 +1,6 @@
+# runtime data written by the kit (manifests, approvals, labelled files, registry) — local only
+data/
+# generator backups
+workflows/*.bak*
+.DS_Store
+__pycache__/
