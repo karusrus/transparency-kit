@@ -2,6 +2,8 @@
 
 Importable n8n workflows that make EU AI Act transparency a property of the production line, not a report written before the audit.
 
+The EU AI Act's transparency duties for deployers apply from 2 August 2026. This kit is the preparation, built ahead of the date: the obligations turned into a property of the production line before anyone asks for a report. The habit comes from work as AI Expert on Horizon Europe projects with GDSI, where an AI component ships only under the programme's mandatory ethics and data-governance requirements — governance there is a condition of funding, not a policy document. The same discipline, applied to a marketing line.
+
 - **AI Act Transparency Kit** — a module any line calls with *Execute Sub-workflow* (or its own intake form): classification under Article 50 → label (ffmpeg service) and provenance manifest → **human approval gate** (a form, or a Slack thread) → approval log → **AI-systems registry of the whole n8n instance with path analysis**: from every node that calls a model, every path forward to a node that reaches people, and what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller.
 - **Audit view** — `GET /webhook/audit`: assets awaiting a human (with gate links), the registry, synthetic media, generated text, the approval log. Read from the Postgres ledger; the approval log is append-only and hash-chained, and the chain is verified on every render.
 - **Recycling notice · three voices** — a real line with the kit as a module: text → Kokoro-82M (local TTS, three stock voices) → AI Act gate → publish only what a human approved.
