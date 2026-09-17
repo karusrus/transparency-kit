@@ -25,8 +25,9 @@ KOKORO_URL = "http://host.docker.internal:8880/tts"
 MEDIA_LABEL_URL = "http://kit-media-label:8881/label"   # ffmpeg label service in its own container; if unreachable, images fall back to Edit Image, media to "disclosure at publication"
 # Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
 PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
-GATE_MODE = "form"          # "form": Wait node with a form (works everywhere) · "slack": Slack Send-and-Wait with the same form, channel members only
+GATE_MODE = "slack"          # "form": Wait node with a form (works everywhere) · "slack": Slack Send-and-Wait with the same form, channel members only
 SLACK_CHANNEL = "#ai-act-gate"
+SLACK = {"slackApi": {"id": "yqaUQ2SkfGomOHLf", "name": "Slack_pipeline_approval"}}   # created by hand in the editor; id is instance-local
 SLACK_POLL_SECONDS = 20
 SLACK_MAX_POLLS = 4320          # 24 h at 20 s
 
@@ -346,7 +347,8 @@ return [{ json: { systems: rows.length, workflows: wfs.length, partial: wfs.leng
 SLACK_PARSE_JS = r"""
 // Look through the thread replies for the first decision by a channel member. Returns decided=false to keep polling.
 const root = $('Post to the review thread').first().json;
-const replies = $input.all().map(i => i.json).filter(m => m.ts !== root.ts && !m.bot_id && m.user);
+const rootTs = root.ts || (root.message && root.message.ts);
+const replies = $input.all().map(i => i.json).filter(m => m.ts !== rootTs && !m.bot_id && m.user);
 let decided = false, decision = '', reason = '', user = '', ts = '';
 for (const m of replies) {
   const t = String(m.text || '').trim(); const low = t.toLowerCase();
@@ -462,15 +464,15 @@ kit_nodes = [
         "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": SLACK_CHANNEL},
         "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nFile: ' + ($('Build manifest').first().json.labelled_path || 'text') + '\\nReply in this thread: *approve* · *editorial* (text only, you take editorial responsibility) · *return <reason>*' }}",
-        "otherOptions": {}}, X(9), 300),
+        "otherOptions": {}}, X(9), 300, credentials=SLACK),
       node("Wait for the thread", "n8n-nodes-base.wait", 1.1, {"resume": "timeInterval", "amount": SLACK_POLL_SECONDS, "unit": "seconds"}, X(10), 300, webhookId="a1b2c3d4-0005-4000-8000-aiactpoll0001"),
       node("Read the thread", "n8n-nodes-base.slack", 2.7, {
         "resource": "channel", "operation": "replies", "channelId": {"__rl": True, "mode": "id", "value": "={{ $('Post to the review thread').first().json.channel }}"},
-        "ts": "={{ $('Post to the review thread').first().json.ts }}", "returnAll": True, "filters": {}}, X(11), 300),
+        "ts": "={{ $('Post to the review thread').first().json.ts || $('Post to the review thread').first().json.message.ts }}", "returnAll": True, "filters": {}}, X(11), 300, credentials=SLACK),
       node("Decided in the thread?", "n8n-nodes-base.code", 2, {"jsCode": SLACK_PARSE_JS.strip()}, X(12), 300),
       node("Decision found?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
         "conditions": [{"id": nid(), "leftValue": "={{ $json.decided }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": True}}], "combinator": "and"}, "options": {}}, X(13), 300),
-      node("Who answered", "n8n-nodes-base.slack", 2.7, {"resource": "user", "operation": "info", "user": {"__rl": True, "mode": "id", "value": "={{ $json.slack_user }}"}}, X(14), 300, onError="continueRegularOutput"),
+      node("Who answered", "n8n-nodes-base.slack", 2.7, {"resource": "user", "operation": "info", "user": {"__rl": True, "mode": "id", "value": "={{ $json.slack_user }}"}}, X(14), 300, onError="continueRegularOutput", credentials=SLACK),
       node("Review & approve", "n8n-nodes-base.code", 2, {"jsCode": SLACK_RESOLVE_JS.strip()}, X(15), 300),
     ] if GATE_MODE == "slack" else [
       node("Review & approve", "n8n-nodes-base.wait", 1.1, {
