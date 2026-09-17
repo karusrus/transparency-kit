@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Act Transparency Kit · every AI asset stops at a named human</title>
+<meta name="description" content="Compliance as a property of the production line: an n8n module with a human approval gate, provenance manifests, an instance-wide AI-systems registry with path analysis, and the page an auditor reads.">
+<style>
+:root{--bg:#0f1115;--card:#161a21;--ink:#e8eaf0;--mut:#9aa3b2;--line:#262c37;--acc:#54A0FF;--ok:#6BCB77;--warn:#FFD166;--bad:#FF5252}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,Inter,"Segoe UI",Roboto,sans-serif}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+header{padding:72px 0 28px}h1{font-size:40px;line-height:1.1;margin:0 0 14px;letter-spacing:-.02em}
+.lead{font-size:20px;color:var(--mut);max-width:820px;margin:0 0 22px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}.btn{display:inline-block;padding:10px 16px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--card)}.btn.p{background:var(--acc);border-color:var(--acc);color:#08131f;font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:36px 0}
+@media(max-width:860px){.two{grid-template-columns:1fr}h1{font-size:30px}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.card img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left;border-bottom:1px solid var(--line)}
+.card .b{padding:16px 18px 18px}.card h3{margin:0 0 6px;font-size:18px}.card p{margin:0 0 10px;color:var(--mut)}
+.num{font-size:28px;font-weight:700;letter-spacing:-.02em}.num small{font-size:13px;color:var(--mut);font-weight:400;margin-left:6px}
+.kicker{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+section{padding:34px 0;border-top:1px solid var(--line)}h2{font-size:26px;margin:0 0 8px;letter-spacing:-.01em}.sub{color:var(--mut);margin:0 0 20px;max-width:820px}
+.map{width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:14px;background:#0b0d11}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#1f2530}.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}.pill.mut{color:var(--mut)}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:18px}.shots figure{margin:0}.shots img{width:100%;border:1px solid var(--line);border-radius:12px}.shots figcaption{color:var(--mut);font-size:14px;margin-top:8px}
+@media(max-width:860px){.shots{grid-template-columns:1fr}}
+ol.steps{padding-left:20px;color:var(--mut)}ol.steps li{margin:6px 0}ol.steps b{color:var(--ink)}
+footer{padding:36px 0 60px;color:var(--mut);font-size:14px;border-top:1px solid var(--line)}
+code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="kicker">AI-assisted production lines · human approval gates · EU AI Act</p>
+  <h1>Every AI asset stops at a named human.<br>The auditor's page fills itself.</h1>
+  <p class="lead">Compliance as a property of the production line, not a report written before the audit. An n8n module you drop in front of any publishing step: it classifies the asset under Article 50, labels it, writes provenance, waits for a person, logs the decision, and keeps a registry of every AI system on the instance with a verdict on each path to the public.</p>
+  <div class="cta">
+    <a class="btn p" href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2">Open the live map</a>
+    <a class="btn" href="audit-view.html">See the auditor's page</a>
+    <a class="btn" href="https://github.com/karusrus/transparency-kit">Source on GitHub</a>
+  </div>
+</header>
+
+<section>
+  <h2>One thesis, two lines</h2>
+  <p class="sub">The same pattern twice: a system does the volume, a person approves, the numbers are reported in the units of the operation. The first line was pitched before it existed; the second runs and produces evidence while it does.</p>
+  <div class="two">
+    <div class="card">
+      <a href="https://karusrus.github.io/pipeline-map/"><img src="https://karusrus.github.io/pipeline-map/docs/shot-overview.jpg" alt="Ad-creative production pipeline draft in Pipeline Map"></a>
+      <div class="b">
+        <p class="kicker">Line 1 · the pitch</p>
+        <h3>Ad-creative production at volume</h3>
+        <p>Brief → concepts → static and video branches → agents on the gates → one human inbox for exceptions. Drawn for a test assignment in an evening; the pattern that produced <b>300 creatives a day</b> where one was made by hand.</p>
+        <div class="num">300<small>creatives / day · ROAS +50–70%</small></div>
+        <p><a href="https://karusrus.github.io/pipeline-map/">Open the draft →</a></p>
+      </div>
+    </div>
+    <div class="card">
+      <a href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2"><img src="map-line.png" alt="The AI Act line: Kokoro voices, the gate, publication"></a>
+      <div class="b">
+        <p class="kicker">Line 2 · the governance</p>
+        <h3>The same gate, now producing evidence</h3>
+        <p>Text → three synthetic voices → <b>AI Act gate</b> → publish only what a person approved. The registry reads every workflow on the instance and flags the ones where AI output reaches people with no disclosure and no human.</p>
+        <div class="num" id="n-cov">6<small>AI systems found · 2 uncovered · 4 decisions logged</small></div>
+        <p><a href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2">Open the live map →</a></p>
+      </div>
+    </div>
+  </div>
+  <p class="sub">The map that sold the first line is the same tool that now draws the second from a live workflow export: the picture is generated from the n8n JSON and the registry, not drawn.</p>
+</section>
+
+<section>
+  <h2>The map</h2>
+  <p class="sub">Keys 1–5 fly between views: everything, the production line, the kit, the flagged sample, the Auditor block with its page. Press <code>A</code> for flow, <code>H</code> to hide the chrome.</p>
+  <iframe class="map" src="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2" title="Pipeline Map with the AI Act Transparency Kit imported" loading="lazy"></iframe>
+</section>
+
+<section>
+  <h2>What the auditor reads</h2>
+  <p class="sub">Five blocks, filled from files the line writes. Nothing typed by hand except the reviewer's decision.</p>
+  <div class="shots">
+    <figure><a href="audit-view.html"><img src="audit-view.png" alt="Audit view"></a><figcaption>The page: awaiting a human, the AI-systems registry with path analysis, synthetic media and deep fakes, generated text, the approval log.</figcaption></figure>
+    <figure><img src="gate.png" alt="Human approval gate"><figcaption>The gate. One asset, its category and obligations, the disclosure sentence in the asset's language, three decisions: approve, editorial exception (text only), return.</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>How a line is judged</h2>
+  <p class="sub">The Act does not regulate links between nodes; it regulates what reaches people. From every node that calls a model, every path forward to a publishing node is walked, and what stood in between decides the verdict.</p>
+  <table>
+    <tr><th>Verdict</th><th>Rule</th><th>For the auditor</th></tr>
+    <tr><td><span class="pill mut">internal</span></td><td>no path reaches a publishing node</td><td>no Art. 50 duty, recorded anyway</td></tr>
+    <tr><td><span class="pill ok">disclosed</span></td><td>every path passes a disclosure step</td><td>disclosure is built into the line</td></tr>
+    <tr><td><span class="pill warn">editorial</span></td><td>no disclosure step, but every path passes a human gate</td><td>text only, Art. 50(4) §2, with a named responsible person</td></tr>
+    <tr><td><span class="pill warn">verify</span></td><td>a destination that may or may not reach people</td><td>a person decides; tag the node</td></tr>
+    <tr><td><span class="pill bad">uncovered</span></td><td>a path reaches people with neither</td><td>AI content goes out with no disclosure and no responsible person</td></tr>
+    <tr><td><span class="pill bad">likeness</span></td><td>a face or voice generator reaches people without a disclosure step</td><td>deep fakes need disclosure regardless of a gate, Art. 50(4) §1</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Embedding it in your line</h2>
+  <ol class="steps">
+    <li>Before the publishing node, add <b>Loop Over Items</b> (batch 1).</li>
+    <li>Inside the loop, <b>Execute Sub-workflow → AI Act gate</b>, passing asset type, language, model, prompt, operator, whether a real person is depicted, whether it informs the public, and the file.</li>
+    <li>After the loop, <b>IF human approved</b>, then publish. The reviewer is notified where the gate is (Slack, or the audit page); the line waits.</li>
+  </ol>
+  <p class="sub">Nothing else changes. The registry reads the instance through the n8n API; the auditor's page reads the files the kit writes. Tag your own publishing nodes <code>[exit]</code> and your own disclosure nodes <code>[AI disclosure]</code> so lines the kit did not build are judged too.</p>
+</section>
+
+<section>
+  <h2>What it is not</h2>
+  <p class="sub">Not legal advice, and not a high-risk (Annex III) system: scope is the deployer side of Article 50 and a voluntary record. Reviewer identity is self-declared unless the gate sits behind an authenticated channel. Files on one host are not a tamper-proof ledger. Those are the next three things to build, in that order.</p>
+</section>
+
+<footer>
+  <p><b>Ruslan Karymov</b> · AI &amp; Automation Lead · Creative, marketing and business operations · <a href="https://karusrus.github.io">karusrus.github.io</a> · <a href="https://github.com/karusrus/transparency-kit">transparency-kit</a> · <a href="https://github.com/karusrus/pipeline-map">pipeline-map</a></p>
+</footer>
+</div>
+</body>
+</html>

@@ -29,7 +29,7 @@ const systems = registry && Array.isArray(registry.systems) ? registry.systems :
 
 const blocks = [
   {
-    n: 1, title: 'AI-systems registry', art: 'Art. 4 · deployer duties',
+    n: 1, title: 'AI-systems registry', art: 'voluntary · supports Art. 4 literacy',
     what: 'Every AI system on this n8n instance, with path analysis: from each node that calls a model, every path forward to a node that reaches people, and what stands in between. Plus every external generator declared at intake. Read from the instance, not typed by hand.',
     body: table([
       ['Status', r => pill(r.path_status)],
@@ -39,7 +39,7 @@ const blocks = [
       ['Evidence (path)', r => `<span class="ev">${esc(r.evidence)}</span>`],
       ['Source', r => esc(r.source)], ['Assets', r => esc(r.assets || '')],
     ], systems),
-    foot: registry ? `Generated ${dt(registry.generated_at)} · ${registry.instance_workflows || 0} workflows scanned: ${(registry.workflows_scanned || []).map(w => esc(w.name)).join(' · ')}<br>Rules: ${esc(registry.rules || '')}` : 'Registry file not written yet.',
+    foot: registry ? `${registry.registry_partial ? '<b style="color:var(--bad)">Partial: the instance could not be read (n8n API credential missing); only declared generators are listed.</b><br>' : ''}Generated ${dt(registry.generated_at)} · ${registry.instance_workflows || 0} workflows scanned: ${(registry.workflows_scanned || []).map(w => esc(w.name)).join(' · ')}<br>Rules: ${esc(registry.rules || '')}` : 'Registry file not written yet.',
   },
   {
     n: 2, title: 'Synthetic media and deep fakes', art: 'Art. 50(4) §1 · Art. 50(2)',
@@ -47,7 +47,7 @@ const blocks = [
     body: table([
       ['ID', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)],
       ['Real person', r => r.depicts_real_person ? 'yes' : 'no'], ['Consent', r => esc(r.consent_reference)],
-      ['Visible label', r => r.label_required ? `yes (${esc(r.label_basis)})` : 'no'], ['Model', r => esc(r.model + (r.model_version ? ' ' + r.model_version : ''))],
+      ['Disclosure', r => !r.label_required ? 'none' : r.asset_type === 'audio' ? `metadata + sentence at publication (${esc(r.label_basis)})` : `burnt-in label (${esc(r.label_basis)})`], ['Model', r => esc(r.model + (r.model_version ? ' ' + r.model_version : ''))],
       ['Prompt hash', r => `<code>${esc(String(r.prompt_sha256).slice(0, 12))}</code>`], ['Operator', r => esc(r.operator)],
       ['Status', r => pill(r.disclosure_status || r.status)], ['Artefact', r => esc(r.labelled_path || r.incoming_path || '')],
     ], media),
@@ -63,8 +63,8 @@ const blocks = [
     ], texts),
   },
   {
-    n: 4, title: 'Approval log', art: 'Art. 14 · Art. 12 (voluntary here)',
-    what: 'Who approved or returned what, when, and why. Human oversight as a property of the line. Logging is mandatory only for high-risk systems; this kit keeps it anyway.',
+    n: 4, title: 'Approval log', art: 'voluntary · Art. 26(6)-style record',
+    what: 'Who approved or returned what, when, and why. Human oversight as a property of the line. Record-keeping is mandatory only for high-risk systems (Art. 26(6)); this kit keeps it anyway. Reviewer identity is self-declared unless the gate is behind an authenticated channel.',
     body: table([
       ['Decided', r => dt(r.decided_at)], ['ID', r => `<code>${esc(r.id)}</code>`], ['Reviewer', r => esc(r.reviewer)],
       ['Decision', r => esc(r.decision)], ['Outcome', r => pill(r.disclosure_status)], ['Reason', r => esc(r.reason || r.note || '')],
@@ -97,7 +97,7 @@ footer{padding:0 32px 40px;color:var(--mut);font-size:12px}
 </style></head><body>
 <header><h1>Audit view · AI Act Transparency Kit</h1><p>What the auditor reads instead of the pipeline. Deployer obligations under the EU AI Act, filled automatically by the line. Generated ${dt(new Date().toISOString())}.</p></header>
 <div class="stats">${stat(systems.length, 'AI systems on the instance')}${stat(systems.filter(r => r.path_status === 'uncovered' || r.path_status === 'likeness').length, 'reach people uncovered')}${stat(systems.filter(r => r.path_status === 'editorial' || r.path_status === 'verify').length, 'need a decision')}${stat(media.length, 'synthetic media assets')}${stat(texts.length, 'generated texts')}${stat(approvals.length, 'decisions logged')}${stat(inbox.length, 'awaiting a human')}</div>
-<main>${inbox.length ? `<section><div class="hd"><span class="n">!</span><h2>Awaiting a human</h2><span class="art">Art. 14 · the gate</span></div><p class="what">Assets stopped at the gate. Open the link, decide, and the row moves to the approval log.</p><div class="wrap">${table([['Since', r => dt(r.created_at)], ['Line', r => esc(r.line)], ['Asset', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)], ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Gate', r => `<a href="${esc(r.gate_url)}">open the gate →</a>`]], inbox)}</div></section>` : ''}${blocks.map(b => `<section><div class="hd"><span class="n">${b.n}</span><h2>${esc(b.title)}</h2><span class="art">${esc(b.art)}</span></div><p class="what">${esc(b.what)}</p><div class="wrap">${b.body}</div>${b.foot ? `<p class="foot">${b.foot}</p>` : ''}</section>`).join('')}</main>
+<main>${inbox.length ? `<section><div class="hd"><span class="n">!</span><h2>Awaiting a human</h2><span class="art">the gate · a named person decides</span></div><p class="what">Assets stopped at the gate. Open the link, decide, and the row moves to the approval log.</p><div class="wrap">${table([['Since', r => dt(r.created_at)], ['Line', r => esc(r.line)], ['Asset', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)], ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Gate', r => `<a href="${esc(r.gate_url)}">open the gate →</a>`]], inbox)}</div></section>` : ''}${blocks.map(b => `<section><div class="hd"><span class="n">${b.n}</span><h2>${esc(b.title)}</h2><span class="art">${esc(b.art)}</span></div><p class="what">${esc(b.what)}</p><div class="wrap">${b.body}</div>${b.foot ? `<p class="foot">${b.foot}</p>` : ''}</section>`).join('')}</main>
 <footer>Scope: deployer duties under Article 50 (in force 2 Aug 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed. Sources: files under /data written by the “AI Act Transparency Kit” workflow.</footer>
 </body></html>`;
 return [{ json: { html, systems: systems.length, manifests: manifests.length, approvals: approvals.length } }];

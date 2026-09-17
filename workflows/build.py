@@ -67,13 +67,15 @@ const id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.
 const type = String(g('Asset type', 'asset_type') || '').toLowerCase();
 const yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());
 const realPerson = yes(g('Depicts a real person (face or voice)?', 'depicts_real_person'));
-const publicInfo = yes(g('Published to inform the public?', 'public_information'));
+const publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));
 const lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();
 const model = String(g('Model', 'model') || '');
 const binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);
 const file = binary_key ? it.binary[binary_key] : null;
-const ext = file && file.fileName && file.fileName.includes('.') ? '.' + file.fileName.split('.').pop().toLowerCase()
-          : (type === 'audio' ? '.wav' : type === 'image' ? '.png' : type === 'video' ? '.mp4' : '');
+const ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };
+const rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';
+const ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');
+const shellSafe = (v) => String(v ?? '').replace(/[^\p{L}\p{N} .,;:()\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered
 
 // Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.
 const DISCLOSURE = {
@@ -85,7 +87,7 @@ const DISCLOSURE = {
 const disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');
 
 let category, label_required = false, label_basis = 'none';
-const obligations = [];
+const obligations = [], other_law = [];
 if (type === 'text') {
   if (publicInfo) {
     category = 'generated_public_text'; label_required = true; label_basis = 'law';
@@ -97,8 +99,8 @@ if (type === 'text') {
 } else {
   if (realPerson) {
     category = 'deepfake'; label_required = true; label_basis = 'law';
-    obligations.push('Art. 50(4) §1 — image, audio or video resembling a real person must carry a disclosure that it is artificially generated or manipulated.');
-    obligations.push('Consent of the depicted person must be on file (consent reference below).');
+    obligations.push('Art. 50(4) §1 — image, audio or video resembling a real person must carry a disclosure that it is artificially generated or manipulated (deep fake, Art. 3(60)). Artistic or satirical works: disclosure may be limited so it does not hamper the work.');
+    other_law.push('Consent or another legal basis for using the person\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');
   } else {
     category = 'synthetic_media';
     label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));
@@ -112,7 +114,7 @@ const inPath  = `/data/incoming/${id}${ext}`;
 const outPath = `/data/labelled/${id}${ext}`;
 const font = '/usr/share/fonts/DejaVuSans.ttf';
 const draw = `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;
-const meta = `-metadata comment="${label_text}; manifest ${id}" -metadata title="${disclosure_sentence.replace(/"/g, '')}"`;
+const meta = `-metadata comment="${label_text}; manifest ${id}" -metadata title="${shellSafe(disclosure_sentence)}"`;
 let ffmpeg_cmd = '';
 if (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -vf "${draw}" ${meta} "${outPath}"`;
 else if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -vf "${draw}" -c:a copy ${meta} "${outPath}"`;
@@ -122,7 +124,7 @@ const manifest = {
   id, created_at: now.toISOString(),
   line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),
   asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,
-  obligations,
+  obligations, other_law,
   model, model_version: String(g('Model version', 'model_version') || ''),
   prompt_sha256: f.prompt_sha256 || '',
   operator: String(g('Operator', 'operator') || ''),
@@ -218,7 +220,8 @@ function classify(n) {
   const url = typeof p.url === 'string' ? p.url : '';
   const isKit = /executeWorkflow$/.test(n.type) && JSON.stringify(p.workflowId || '').includes(KIT_ID);
   const gen = AI_TYPE.test(n.type) || AI_HOST.test(url);
-  const gate = isKit || GATE_TYPE.test(n.type) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));
+  const waitsForPerson = /n8n-nodes-base\.wait$/.test(n.type) ? ['form', 'webhook'].includes(String(p.resume || '')) : true;   // a timer is not a human
+  const gate = isKit || (GATE_TYPE.test(n.type) && waitsForPerson) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));
   const disclose = isKit || NAME_DISCLOSE.test(n.name);
   const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);
   const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\.docker\.internal|localhost|127\.0\.0\.1/.test(url))
@@ -308,14 +311,15 @@ for (const line of raw.split('\n')) {
     if (seen.has(key)) { seen.get(key).assets += 1; continue; }
     seen.set(key, { system: m.model + (m.model_version ? ' ' + m.model_version : ''), source: 'declared in manifest', workflow: m.line || 'outside n8n', workflow_active: null,
                     node_type: 'external generator', model: m.model, role: 'deployer', exits: [],
-                    path_status: 'disclosed', evidence: 'declared at intake, passed through this kit (' + m.asset_type + ')',
+                    path_status: m.status === 'pending_review' ? 'verify' : (m.disclosure_status === 'disclosed' || m.disclosure_status === 'editorial_exception' || m.disclosure_status === 'not_required') ? 'disclosed' : m.disclosure_status === 'returned' ? 'internal' : 'verify',
+                    evidence: 'declared at intake, passed through this kit (' + m.asset_type + '), decision: ' + (m.disclosure_status || m.status),
                     first_seen: String(m.created_at || '').slice(0,10), assets: 1 });
   } catch (e) {}
 }
 rows.push(...seen.values());
 const order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };
 rows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));
-const registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length,
+const registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length, registry_partial: wfs.length === 0,
                    workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),
                    rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',
                    systems: rows };
@@ -339,7 +343,8 @@ GATE_HTML = ("={{ (() => { const m = $('Build manifest').first().json; const esc
              " + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>'"
              " + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>'"
              " + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>'"
-             " + '<p style=\"margin:0 0 4px\"><b>Obligations</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>'"
+             " + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>'"
+             " + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')"
              " + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '')"
              " + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '')"
              " + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '')"
@@ -369,7 +374,7 @@ kit_nodes = [
             {"fieldLabel": "Operator", "placeholder": "who ran the generation", "requiredField": True},
             {"fieldLabel": "Depicts a real person (face or voice)?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
             {"fieldLabel": "Consent reference", "placeholder": "link or id of the person's consent, if a real person is depicted"},
-            {"fieldLabel": "Published to inform the public?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
+            {"fieldLabel": "Published to inform the public on a matter of public interest?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
             {"fieldLabel": "Text content", "fieldType": "textarea", "placeholder": "for text assets"},
             {"fieldLabel": "File", "fieldType": "file", "multipleFiles": False},
         ]},
@@ -386,30 +391,35 @@ kit_nodes = [
         "command": "={{ $('Classify (Art. 50)').first().json.ffmpeg_cmd || 'true' }}"}, X(5), 440),
     node("Build manifest", "n8n-nodes-base.code", 2, {"jsCode": MANIFEST_JS.strip()}, X(6), 300),
     node("Write manifest + inbox", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(7), 300),
+    node("Notify reviewer (Slack)", "n8n-nodes-base.slack", 2.3, {
+        "resource": "message", "operation": "post", "select": "channel",
+        "channelId": {"__rl": True, "mode": "name", "value": "#ai-act-gate"},
+        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
+        "otherOptions": {}}, X(8), 160, onError="continueRegularOutput", notes="The human is told where the gate is. Attach a Slack credential and pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."),
     node("Review & approve", "n8n-nodes-base.wait", 1.1, {
         "resume": "form", "formTitle": "Human approval gate",
         "formDescription": "One asset, one decision. Everything below was filled by the line.",
-        "formFields": GATE_FIELDS, "options": {}}, X(8), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001"),
-    node("Resolve decision", "n8n-nodes-base.code", 2, {"jsCode": RESOLVE_JS.strip()}, X(9), 300),
-    node("Write approval + manifest", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(10), 300),
-    node("Read manifests", "n8n-nodes-base.executeCommand", 1, {"command": READ_MANIFESTS_SH}, X(11), 300),
+        "formFields": GATE_FIELDS, "options": {}}, X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001"),
+    node("Resolve decision", "n8n-nodes-base.code", 2, {"jsCode": RESOLVE_JS.strip()}, X(10), 300),
+    node("Write approval + manifest", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(11), 300),
+    node("Read manifests", "n8n-nodes-base.executeCommand", 1, {"command": READ_MANIFESTS_SH}, X(12), 300),
     node("Read all workflows", "n8n-nodes-base.n8n", 1, {"resource": "workflow", "operation": "getAll", "returnAll": True, "filters": {}},
-         X(12), 300, onError="continueRegularOutput", credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
-    node("Registry rows", "n8n-nodes-base.code", 2, {"jsCode": REGISTRY_JS.strip()}, X(13), 300),
-    node("Write registry", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(14), 300),
-    node("Return to caller", "n8n-nodes-base.code", 2, {"jsCode": RETURN_JS.strip()}, X(15), 300),
-    node("How it works", "n8n-nodes-base.stickyNote", 1, {"width": 1700, "height": 130, "content":
+         X(13), 300, onError="continueRegularOutput", credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
+    node("Registry rows", "n8n-nodes-base.code", 2, {"jsCode": REGISTRY_JS.strip()}, X(14), 300),
+    node("Write registry", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(15), 300),
+    node("Return to caller", "n8n-nodes-base.code", 2, {"jsCode": RETURN_JS.strip()}, X(16), 300),
+    node("How it works", "n8n-nodes-base.stickyNote", 1, {"width": 1950, "height": 130, "content":
         "## AI Act Transparency Kit — deployer side of Article 50, as a module\n"
         "Two entries: its own intake form, or **Execute Sub-workflow** from any production line (pass asset_type, language, model, prompt, operator, depicts_real_person, public_information, caller_workflow and the file as binary `data`). "
         "classify → label + manifest → **Wait-form human gate** (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. "
-        "Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."}, X(0), 0),
+        "Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."}, X(1), 0),
 ]
 kit_conn = wire(
     ("Asset produced", "Prompt hash"), ("Called by another workflow", "Prompt hash"),
     ("Prompt hash", "Classify (Art. 50)"), ("Classify (Art. 50)", "Is text?"),
     ("Is text?", "Text disclosure", 0), ("Is text?", "Save incoming file", 1),
     ("Text disclosure", "Build manifest"), ("Save incoming file", "Label with ffmpeg"), ("Label with ffmpeg", "Build manifest"),
-    ("Build manifest", "Write manifest + inbox"), ("Write manifest + inbox", "Review & approve"),
+    ("Build manifest", "Write manifest + inbox"), ("Write manifest + inbox", "Notify reviewer (Slack)"), ("Notify reviewer (Slack)", "Review & approve"),
     ("Review & approve", "Resolve decision"), ("Resolve decision", "Write approval + manifest"),
     ("Write approval + manifest", "Read manifests"), ("Read manifests", "Read all workflows"),
     ("Read all workflows", "Registry rows"), ("Registry rows", "Write registry"), ("Write registry", "Return to caller"),
@@ -492,7 +502,7 @@ host_nodes = [
     node("One voice at a time", "n8n-nodes-base.splitInBatches", 3, {"batchSize": 1, "options": {}}, X(4), 300),
     node("AI Act gate", "n8n-nodes-base.executeWorkflow", 1.2, {
         "workflowId": {"__rl": True, "mode": "id", "value": KIT_ID}, "mode": "once", "options": {"waitForSubWorkflow": True}}, X(5), 460),
-    node("Approved?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
+    node("Human approved?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
         "conditions": [{"id": nid(), "leftValue": "={{ $json.approved }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
         "combinator": "and"}, "options": {}}, X(6), 200),
     node("Prepare publish", "n8n-nodes-base.code", 2, {"jsCode": PREPARE_PUBLISH_JS.strip()}, X(7), 100),
@@ -504,9 +514,9 @@ host_nodes = [
 ]
 host = {"id": HOST_ID, "name": "Recycling notice · three voices", "nodes": host_nodes,
         "connections": wire(("Notice text", "Three voices"), ("Three voices", "Kokoro TTS (local)"), ("Kokoro TTS (local)", "Attach fields"),
-                            ("Attach fields", "One voice at a time"), ("One voice at a time", "Approved?", 0), ("One voice at a time", "AI Act gate", 1),
+                            ("Attach fields", "One voice at a time"), ("One voice at a time", "Human approved?", 0), ("One voice at a time", "AI Act gate", 1),
                             ("AI Act gate", "One voice at a time"),
-                            ("Approved?", "Prepare publish", 0), ("Prepare publish", "Publish to site [exit]"), ("Approved?", "Returned, not published", 1)),
+                            ("Human approved?", "Prepare publish", 0), ("Prepare publish", "Publish to site [exit]"), ("Human approved?", "Returned, not published", 1)),
         "active": False, "settings": {"executionOrder": "v1", "saveManualExecutions": True}}
 
 for name, wf in (("transparency-kit.json", kit), ("audit-view.json", audit), ("host-line.json", host)):

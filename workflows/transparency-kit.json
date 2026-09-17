@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "d153f219-3f86-4a74-b66e-333cec7af071",
+      "id": "415389a7-920e-4d6b-8f00-acd14b8825a9",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -97,7 +97,7 @@
               "placeholder": "link or id of the person's consent, if a real person is depicted"
             },
             {
-              "fieldLabel": "Published to inform the public?",
+              "fieldLabel": "Published to inform the public on a matter of public interest?",
               "fieldType": "dropdown",
               "fieldOptions": {
                 "values": [
@@ -130,7 +130,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "e5bd14aa-12fe-48c8-b57c-af8cf91a7b5c",
+      "id": "fab12556-6a60-457d-b5ad-2ebd2d388b73",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -143,7 +143,7 @@
       }
     },
     {
-      "id": "2b2e0301-93fd-4118-821c-4e54865b808a",
+      "id": "3c02b75f-814c-429f-9c13-7f7105ab5f63",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -159,7 +159,7 @@
       }
     },
     {
-      "id": "918008a4-ef9f-41c6-bf61-9273b33f024d",
+      "id": "873979a6-ac38-4c26-8359-a83cfd0d16c0",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -168,11 +168,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst realPerson = yes(g('Depicts a real person (face or voice)?', 'depicts_real_person'));\nconst publicInfo = yes(g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ext = file && file.fileName && file.fileName.includes('.') ? '.' + file.fileName.split('.').pop().toLowerCase()\n          : (type === 'audio' ? '.wav' : type === 'image' ? '.png' : type === 'video' ? '.mp4' : '');\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson) {\n    category = 'deepfake'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §1 — image, audio or video resembling a real person must carry a disclosure that it is artificially generated or manipulated.');\n    obligations.push('Consent of the depicted person must be on file (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = 'AI-generated · EU AI Act Art. 50';\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst font = '/usr/share/fonts/DejaVuSans.ttf';\nconst draw = `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;\nconst meta = `-metadata comment=\"${label_text}; manifest ${id}\" -metadata title=\"${disclosure_sentence.replace(/\"/g, '')}\"`;\nlet ffmpeg_cmd = '';\nif (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" ${meta} \"${outPath}\"`;\nelse if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" -c:a copy ${meta} \"${outPath}\"`;\nelse if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -c copy ${meta} \"${outPath}\"`;\n\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];"
+        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst realPerson = yes(g('Depicts a real person (face or voice)?', 'depicts_real_person'));\nconst publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };\nconst rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';\nconst ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');\nconst shellSafe = (v) => String(v ?? '').replace(/[^\\p{L}\\p{N} .,;:()\\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [], other_law = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson) {\n    category = 'deepfake'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §1 — image, audio or video resembling a real person must carry a disclosure that it is artificially generated or manipulated (deep fake, Art. 3(60)). Artistic or satirical works: disclosure may be limited so it does not hamper the work.');\n    other_law.push('Consent or another legal basis for using the person\\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = 'AI-generated · EU AI Act Art. 50';\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst font = '/usr/share/fonts/DejaVuSans.ttf';\nconst draw = `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;\nconst meta = `-metadata comment=\"${label_text}; manifest ${id}\" -metadata title=\"${shellSafe(disclosure_sentence)}\"`;\nlet ffmpeg_cmd = '';\nif (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" ${meta} \"${outPath}\"`;\nelse if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" -c:a copy ${meta} \"${outPath}\"`;\nelse if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -c copy ${meta} \"${outPath}\"`;\n\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations, other_law,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];"
       }
     },
     {
-      "id": "6268a814-dd85-4727-81d3-e2f20f92ba71",
+      "id": "2b872266-a050-46f2-a255-84ffeb573f12",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -190,7 +190,7 @@
           },
           "conditions": [
             {
-              "id": "ee6095ce-dc62-4665-a0ae-72c782b2ae76",
+              "id": "de8a5765-bc97-449c-93b2-b7e3fc98afa5",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -205,7 +205,7 @@
       }
     },
     {
-      "id": "e7b3d286-7dcb-40cc-b4cf-34c3857ab759",
+      "id": "637fa03d-0b51-41a7-9133-3fce10ca1e1c",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -218,7 +218,7 @@
       }
     },
     {
-      "id": "66f3e62e-0aa0-4004-8b90-f64659415744",
+      "id": "71dcc1ae-d72a-4401-9257-6222c6465b9c",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -234,7 +234,7 @@
       }
     },
     {
-      "id": "967fe5b3-6883-4ceb-b96a-636597d1fa3e",
+      "id": "b1322668-92f6-4cda-8512-5ff2d07dc994",
       "name": "Label with ffmpeg",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -247,7 +247,7 @@
       }
     },
     {
-      "id": "88be3f76-8ad3-43b2-a551-8e213136dfef",
+      "id": "aeca1933-f045-45ce-b07b-33168dd48343",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -260,7 +260,7 @@
       }
     },
     {
-      "id": "d04a4ac7-bae8-46e9-b8e3-4593d6fea0e0",
+      "id": "7b15547c-994b-49ca-9d26-a96dc7dc6f8a",
       "name": "Write manifest + inbox",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -273,12 +273,36 @@
       }
     },
     {
-      "id": "a5b36452-a2a9-4e45-a870-0106b6185535",
+      "id": "bfa7b5d8-f635-45dd-9d48-f742eb1d2a81",
+      "name": "Notify reviewer (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#ai-act-gate"
+        },
+        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
+        "otherOptions": {}
+      },
+      "onError": "continueRegularOutput",
+      "notes": "The human is told where the gate is. Attach a Slack credential and pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
+    },
+    {
+      "id": "03368fe6-1a1a-4d30-90ad-dc8bfb9805a7",
       "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1920,
+        2160,
         300
       ],
       "parameters": {
@@ -291,7 +315,7 @@
               "fieldLabel": "Context",
               "fieldType": "html",
               "elementName": "context",
-              "html": "={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">' + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>' + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>' + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>' + '<p style=\"margin:0 0 4px\"><b>Obligations</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '') + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '') + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '') + '</div>'; })() }}"
+              "html": "={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">' + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>' + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>' + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>' + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '') + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '') + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '') + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '') + '</div>'; })() }}"
             },
             {
               "fieldLabel": "Decision",
@@ -326,12 +350,12 @@
       "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "7aaa3e29-d28c-4d75-b1a0-cb2ea03835ec",
+      "id": "b5352cc6-5b5e-4c70-9e7c-663889f83ec1",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
+        2400,
         300
       ],
       "parameters": {
@@ -339,21 +363,8 @@
       }
     },
     {
-      "id": "34569e61-2ce6-4317-a574-29e398987cc6",
+      "id": "9e8beba7-7533-49f3-bc9a-62c289ea3d77",
       "name": "Write approval + manifest",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        2400,
-        300
-      ],
-      "parameters": {
-        "command": "={{ $json.write_cmd }}"
-      }
-    },
-    {
-      "id": "a3cece5f-4b73-43f8-91b2-cde966508094",
-      "name": "Read manifests",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
@@ -361,16 +372,29 @@
         300
       ],
       "parameters": {
+        "command": "={{ $json.write_cmd }}"
+      }
+    },
+    {
+      "id": "8c23b511-1036-49d3-a1c2-df9816d6141d",
+      "name": "Read manifests",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        300
+      ],
+      "parameters": {
         "command": "for f in /data/manifests/*.json; do [ -f \"$f\" ] && node -e 'process.stdout.write(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\")))+\"\\n\")' \"$f\"; done; true"
       }
     },
     {
-      "id": "458cd39b-ec82-4500-a2f5-a1a03e8ea0b0",
+      "id": "d47fe9ed-9d0f-45d4-908b-36e9de96d677",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
       "position": [
-        2880,
+        3120,
         300
       ],
       "parameters": {
@@ -388,25 +412,25 @@
       }
     },
     {
-      "id": "d34960f5-e101-4012-a5a7-3c9daafd9ad7",
+      "id": "733a1302-9af7-4b12-bf72-8fed75b18ff3",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3120,
+        3360,
         300
       ],
       "parameters": {
-        "jsCode": "// AI-systems registry for the whole n8n instance, with path analysis per generator.\n// Source 1: every workflow on the instance (n8n API). For each node that calls a model, walk every path forward\n//           to every node that reaches people and check what stands in between.\n// Source 2: models declared in manifests (generation often happens outside n8n).\nconst KIT_ID = 'AiActTransparenc';\nconst wfs = $input.all().map(i => i.json).filter(w => w && Array.isArray(w.nodes));\n\nconst AI_TYPE = /langchain|openai|anthropic|ollama|gemini|mistral|huggingface|groq|cohere|deepseek|perplexity|xai|elevenlabs|replicate|stability|bedrock|vertex|azureopenai|heygen|midjourney|runway|bannerbear|kokoro/i;\nconst AI_HOST = /api\\.openai\\.com|api\\.anthropic\\.com|:11434|:8880|kokoro|api\\.elevenlabs\\.io|api\\.replicate\\.com|api\\.stability\\.ai|generativelanguage\\.googleapis|api\\.mistral\\.ai|api\\.heygen\\.com|api\\.bannerbear\\.com|api\\.groq\\.com|api\\.cohere|api\\.deepseek\\.com|api\\.x\\.ai|openrouter\\.ai|api\\.d-id\\.com|api\\.synthesia\\.io/i;\nconst LIKENESS = /elevenlabs|heygen|d-id|synthesia|voice.?clone|clone/i;             // can reproduce a real face or voice\nconst EXIT_TYPE = /linkedIn|twitter|facebook|instagram|youTube|tiktok|wordpress|ghost|webflow|contentful|mailchimp|brevo|sendinblue|sendgrid|mailgun|emailSend|gmail|microsoftOutlook|telegram|whatsApp|twilio|messageBird|discord|reddit|medium|hubspot|activeCampaign|klaviyo/i;\nconst GATE_TYPE = /n8n-nodes-base\\.form$|n8n-nodes-base\\.wait$/;\nconst GATE_OP = /sendAndWait|approval/i;\nconst NAME_EXIT = /\\[exit\\]/i;               // convention: tag your own publishing nodes\nconst NAME_DISCLOSE = /\\[ai disclosure\\]/i;  // convention: tag your own disclosure/label nodes\n\nfunction classify(n) {\n  const p = n.parameters || {};\n  const url = typeof p.url === 'string' ? p.url : '';\n  const isKit = /executeWorkflow$/.test(n.type) && JSON.stringify(p.workflowId || '').includes(KIT_ID);\n  const gen = AI_TYPE.test(n.type) || AI_HOST.test(url);\n  const gate = isKit || GATE_TYPE.test(n.type) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));\n  const disclose = isKit || NAME_DISCLOSE.test(n.name);\n  const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);\n  const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\\.docker\\.internal|localhost|127\\.0\\.0\\.1/.test(url))\n                    || /slack|notion|googleSheets|airtable|microsoftTeams|mattermost/i.test(n.type));\n  return { gen, gate, disclose, exit, maybeExit, isKit, likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };\n}\n\nfunction modelOf(n) {\n  const p = n.parameters || {};\n  let model = (p.model && (p.model.value || p.model)) || (p.modelId && (p.modelId.value || p.modelId)) || '';\n  if (!model && typeof p.jsonBody === 'string') { const mm = p.jsonBody.match(/model['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]/); if (mm) model = mm[1]; }\n  if (!model && typeof p.url === 'string' && p.url) model = p.url.replace(/^https?:\\/\\//, '').split('/')[0];\n  return String(model);\n}\n\nfunction analyse(w) {\n  const nodes = w.nodes.filter(n => !/stickyNote$/.test(n.type));\n  const byName = Object.fromEntries(nodes.map(n => [n.name, n]));\n  const cls = Object.fromEntries(nodes.map(n => [n.name, classify(n)]));\n  const outs = (name) => {\n    const c = (w.connections || {})[name];\n    if (!c || !Array.isArray(c.main)) return [];\n    return c.main.map((edges, idx) => (edges || []).map(e => e && e.node).filter(t => t && byName[t]).map(t => ({ t, idx })));\n  };\n  const next = (name) => outs(name).flat().map(o => o.t);\n  const isLoop = (name) => /splitInBatches$/.test(byName[name].type);\n  // what the loop body (output 1, back to the loop node) passes through\n  const bodyFlags = (loop) => {\n    let gate = false, disc = false; const seen = new Set([loop]);\n    const stack = (outs(loop)[1] || []).map(o => o.t);\n    while (stack.length) {\n      const x = stack.pop(); if (seen.has(x)) continue; seen.add(x);\n      if (!byName[x].disabled) { gate = gate || cls[x].gate; disc = disc || cls[x].disclose; }\n      for (const y of next(x)) if (!seen.has(y)) stack.push(y);\n    }\n    return { gate, disc };\n  };\n  const rows = [];\n  for (const n of nodes) {\n    const c = cls[n.name];\n    if (!c.gen || n.disabled) continue;\n    // enumerate paths forward (capped), remembering what each path passed through\n    const paths = [];\n    const walk = (name, seen, gate, disc, trail) => {\n      if (paths.length > 300) return;\n      const loopBody = isLoop(name) ? bodyFlags(name) : null;\n      for (const { t, idx } of outs(name).flat()) {\n        if (seen.has(t)) continue;\n        const tc = cls[t]; const dn = byName[t].disabled;\n        let g2 = gate || (!dn && tc.gate), d2 = disc || (!dn && tc.disclose);\n        if (loopBody && idx === 0) { g2 = g2 || loopBody.gate; d2 = d2 || loopBody.disc; }   // \"done\" output: items went through the body\n        const trail2 = trail.concat(t);\n        if (tc.exit || tc.maybeExit) paths.push({ exit: t, kind: tc.exit ? 'exit' : 'maybe', gate: g2, disc: d2, trail: trail2 });\n        walk(t, new Set([...seen, t]), g2, d2, trail2);\n      }\n    };\n    walk(n.name, new Set([n.name]), false, false, [n.name]);\n    const real = paths.filter(p => p.kind === 'exit'), maybe = paths.filter(p => p.kind === 'maybe');\n    let status, evidence;\n    const fmt = (p) => p.trail.join(' → ');\n    if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }\n    else if (real.some(p => !p.disc && !p.gate)) { const p = real.find(p => !p.disc && !p.gate); status = 'uncovered'; evidence = fmt(p) + ' — no disclosure, no human gate on this path'; }\n    else if (c.likeness && real.some(p => !p.disc)) { const p = real.find(p => !p.disc); status = 'likeness'; evidence = fmt(p) + ' — face/voice generator reaches people without a disclosure step (gate alone is not enough for Art. 50(4) §1)'; }\n    else if (real.length && real.every(p => p.disc)) { status = 'disclosed'; evidence = fmt(real[0]); }\n    else if (real.length && real.every(p => p.disc || p.gate)) { const p = real.find(p => !p.disc); status = 'editorial'; evidence = fmt(p) + ' — human gate but no disclosure step: allowed for text only, with a named responsible person'; }\n    else { status = 'verify'; evidence = fmt(maybe[0]) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    if (status === 'disclosed' && maybe.some(p => !p.disc && !p.gate)) { status = 'verify'; evidence = fmt(maybe.find(p => !p.disc && !p.gate)) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    rows.push({ system: n.name, source: 'workflow node', workflow: w.name, workflow_id: w.id, workflow_active: !!w.active,\n                node_type: n.type.replace('@n8n/n8n-nodes-langchain.', 'langchain.').replace('n8n-nodes-base.', ''), model: modelOf(n),\n                role: 'deployer', likeness: c.likeness, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),\n                path_status: status, evidence, first_seen: new Date().toISOString().slice(0,10) });\n  }\n  return rows;\n}\n\nconst rows = [];\nfor (const w of wfs) rows.push(...analyse(w));\n\nconst raw = String($('Read manifests').first().json.stdout || '');\nconst seen = new Map();\nfor (const line of raw.split('\\n')) {\n  const t = line.trim(); if (!t.startsWith('{')) continue;\n  try {\n    const m = JSON.parse(t);\n    const key = (m.model || '') + '|' + (m.model_version || '');\n    if (!m.model) continue;\n    if (seen.has(key)) { seen.get(key).assets += 1; continue; }\n    seen.set(key, { system: m.model + (m.model_version ? ' ' + m.model_version : ''), source: 'declared in manifest', workflow: m.line || 'outside n8n', workflow_active: null,\n                    node_type: 'external generator', model: m.model, role: 'deployer', exits: [],\n                    path_status: 'disclosed', evidence: 'declared at intake, passed through this kit (' + m.asset_type + ')',\n                    first_seen: String(m.created_at || '').slice(0,10), assets: 1 });\n  } catch (e) {}\n}\nrows.push(...seen.values());\nconst order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };\nrows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));\nconst registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length,\n                   workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),\n                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',\n                   systems: rows };\nconst cmd = `printf %s ${Buffer.from(JSON.stringify(registry, null, 2)).toString('base64')} | base64 -d > /data/registry.json`;\nreturn [{ json: { systems: rows.length, workflows: wfs.length, write_cmd: cmd } }];"
+        "jsCode": "// AI-systems registry for the whole n8n instance, with path analysis per generator.\n// Source 1: every workflow on the instance (n8n API). For each node that calls a model, walk every path forward\n//           to every node that reaches people and check what stands in between.\n// Source 2: models declared in manifests (generation often happens outside n8n).\nconst KIT_ID = 'AiActTransparenc';\nconst wfs = $input.all().map(i => i.json).filter(w => w && Array.isArray(w.nodes));\n\nconst AI_TYPE = /langchain|openai|anthropic|ollama|gemini|mistral|huggingface|groq|cohere|deepseek|perplexity|xai|elevenlabs|replicate|stability|bedrock|vertex|azureopenai|heygen|midjourney|runway|bannerbear|kokoro/i;\nconst AI_HOST = /api\\.openai\\.com|api\\.anthropic\\.com|:11434|:8880|kokoro|api\\.elevenlabs\\.io|api\\.replicate\\.com|api\\.stability\\.ai|generativelanguage\\.googleapis|api\\.mistral\\.ai|api\\.heygen\\.com|api\\.bannerbear\\.com|api\\.groq\\.com|api\\.cohere|api\\.deepseek\\.com|api\\.x\\.ai|openrouter\\.ai|api\\.d-id\\.com|api\\.synthesia\\.io/i;\nconst LIKENESS = /elevenlabs|heygen|d-id|synthesia|voice.?clone|clone/i;             // can reproduce a real face or voice\nconst EXIT_TYPE = /linkedIn|twitter|facebook|instagram|youTube|tiktok|wordpress|ghost|webflow|contentful|mailchimp|brevo|sendinblue|sendgrid|mailgun|emailSend|gmail|microsoftOutlook|telegram|whatsApp|twilio|messageBird|discord|reddit|medium|hubspot|activeCampaign|klaviyo/i;\nconst GATE_TYPE = /n8n-nodes-base\\.form$|n8n-nodes-base\\.wait$/;\nconst GATE_OP = /sendAndWait|approval/i;\nconst NAME_EXIT = /\\[exit\\]/i;               // convention: tag your own publishing nodes\nconst NAME_DISCLOSE = /\\[ai disclosure\\]/i;  // convention: tag your own disclosure/label nodes\n\nfunction classify(n) {\n  const p = n.parameters || {};\n  const url = typeof p.url === 'string' ? p.url : '';\n  const isKit = /executeWorkflow$/.test(n.type) && JSON.stringify(p.workflowId || '').includes(KIT_ID);\n  const gen = AI_TYPE.test(n.type) || AI_HOST.test(url);\n  const waitsForPerson = /n8n-nodes-base\\.wait$/.test(n.type) ? ['form', 'webhook'].includes(String(p.resume || '')) : true;   // a timer is not a human\n  const gate = isKit || (GATE_TYPE.test(n.type) && waitsForPerson) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));\n  const disclose = isKit || NAME_DISCLOSE.test(n.name);\n  const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);\n  const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\\.docker\\.internal|localhost|127\\.0\\.0\\.1/.test(url))\n                    || /slack|notion|googleSheets|airtable|microsoftTeams|mattermost/i.test(n.type));\n  return { gen, gate, disclose, exit, maybeExit, isKit, likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };\n}\n\nfunction modelOf(n) {\n  const p = n.parameters || {};\n  let model = (p.model && (p.model.value || p.model)) || (p.modelId && (p.modelId.value || p.modelId)) || '';\n  if (!model && typeof p.jsonBody === 'string') { const mm = p.jsonBody.match(/model['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]/); if (mm) model = mm[1]; }\n  if (!model && typeof p.url === 'string' && p.url) model = p.url.replace(/^https?:\\/\\//, '').split('/')[0];\n  return String(model);\n}\n\nfunction analyse(w) {\n  const nodes = w.nodes.filter(n => !/stickyNote$/.test(n.type));\n  const byName = Object.fromEntries(nodes.map(n => [n.name, n]));\n  const cls = Object.fromEntries(nodes.map(n => [n.name, classify(n)]));\n  const outs = (name) => {\n    const c = (w.connections || {})[name];\n    if (!c || !Array.isArray(c.main)) return [];\n    return c.main.map((edges, idx) => (edges || []).map(e => e && e.node).filter(t => t && byName[t]).map(t => ({ t, idx })));\n  };\n  const next = (name) => outs(name).flat().map(o => o.t);\n  const isLoop = (name) => /splitInBatches$/.test(byName[name].type);\n  // what the loop body (output 1, back to the loop node) passes through\n  const bodyFlags = (loop) => {\n    let gate = false, disc = false; const seen = new Set([loop]);\n    const stack = (outs(loop)[1] || []).map(o => o.t);\n    while (stack.length) {\n      const x = stack.pop(); if (seen.has(x)) continue; seen.add(x);\n      if (!byName[x].disabled) { gate = gate || cls[x].gate; disc = disc || cls[x].disclose; }\n      for (const y of next(x)) if (!seen.has(y)) stack.push(y);\n    }\n    return { gate, disc };\n  };\n  const rows = [];\n  for (const n of nodes) {\n    const c = cls[n.name];\n    if (!c.gen || n.disabled) continue;\n    // enumerate paths forward (capped), remembering what each path passed through\n    const paths = [];\n    const walk = (name, seen, gate, disc, trail) => {\n      if (paths.length > 300) return;\n      const loopBody = isLoop(name) ? bodyFlags(name) : null;\n      for (const { t, idx } of outs(name).flat()) {\n        if (seen.has(t)) continue;\n        const tc = cls[t]; const dn = byName[t].disabled;\n        let g2 = gate || (!dn && tc.gate), d2 = disc || (!dn && tc.disclose);\n        if (loopBody && idx === 0) { g2 = g2 || loopBody.gate; d2 = d2 || loopBody.disc; }   // \"done\" output: items went through the body\n        const trail2 = trail.concat(t);\n        if (tc.exit || tc.maybeExit) paths.push({ exit: t, kind: tc.exit ? 'exit' : 'maybe', gate: g2, disc: d2, trail: trail2 });\n        walk(t, new Set([...seen, t]), g2, d2, trail2);\n      }\n    };\n    walk(n.name, new Set([n.name]), false, false, [n.name]);\n    const real = paths.filter(p => p.kind === 'exit'), maybe = paths.filter(p => p.kind === 'maybe');\n    let status, evidence;\n    const fmt = (p) => p.trail.join(' → ');\n    if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }\n    else if (real.some(p => !p.disc && !p.gate)) { const p = real.find(p => !p.disc && !p.gate); status = 'uncovered'; evidence = fmt(p) + ' — no disclosure, no human gate on this path'; }\n    else if (c.likeness && real.some(p => !p.disc)) { const p = real.find(p => !p.disc); status = 'likeness'; evidence = fmt(p) + ' — face/voice generator reaches people without a disclosure step (gate alone is not enough for Art. 50(4) §1)'; }\n    else if (real.length && real.every(p => p.disc)) { status = 'disclosed'; evidence = fmt(real[0]); }\n    else if (real.length && real.every(p => p.disc || p.gate)) { const p = real.find(p => !p.disc); status = 'editorial'; evidence = fmt(p) + ' — human gate but no disclosure step: allowed for text only, with a named responsible person'; }\n    else { status = 'verify'; evidence = fmt(maybe[0]) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    if (status === 'disclosed' && maybe.some(p => !p.disc && !p.gate)) { status = 'verify'; evidence = fmt(maybe.find(p => !p.disc && !p.gate)) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    rows.push({ system: n.name, source: 'workflow node', workflow: w.name, workflow_id: w.id, workflow_active: !!w.active,\n                node_type: n.type.replace('@n8n/n8n-nodes-langchain.', 'langchain.').replace('n8n-nodes-base.', ''), model: modelOf(n),\n                role: 'deployer', likeness: c.likeness, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),\n                path_status: status, evidence, first_seen: new Date().toISOString().slice(0,10) });\n  }\n  return rows;\n}\n\nconst rows = [];\nfor (const w of wfs) rows.push(...analyse(w));\n\nconst raw = String($('Read manifests').first().json.stdout || '');\nconst seen = new Map();\nfor (const line of raw.split('\\n')) {\n  const t = line.trim(); if (!t.startsWith('{')) continue;\n  try {\n    const m = JSON.parse(t);\n    const key = (m.model || '') + '|' + (m.model_version || '');\n    if (!m.model) continue;\n    if (seen.has(key)) { seen.get(key).assets += 1; continue; }\n    seen.set(key, { system: m.model + (m.model_version ? ' ' + m.model_version : ''), source: 'declared in manifest', workflow: m.line || 'outside n8n', workflow_active: null,\n                    node_type: 'external generator', model: m.model, role: 'deployer', exits: [],\n                    path_status: m.status === 'pending_review' ? 'verify' : (m.disclosure_status === 'disclosed' || m.disclosure_status === 'editorial_exception' || m.disclosure_status === 'not_required') ? 'disclosed' : m.disclosure_status === 'returned' ? 'internal' : 'verify',\n                    evidence: 'declared at intake, passed through this kit (' + m.asset_type + '), decision: ' + (m.disclosure_status || m.status),\n                    first_seen: String(m.created_at || '').slice(0,10), assets: 1 });\n  } catch (e) {}\n}\nrows.push(...seen.values());\nconst order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };\nrows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));\nconst registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length, registry_partial: wfs.length === 0,\n                   workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),\n                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',\n                   systems: rows };\nconst cmd = `printf %s ${Buffer.from(JSON.stringify(registry, null, 2)).toString('base64')} | base64 -d > /data/registry.json`;\nreturn [{ json: { systems: rows.length, workflows: wfs.length, write_cmd: cmd } }];"
       }
     },
     {
-      "id": "32374761-7320-4051-98a1-2bdce61484f2",
+      "id": "e788653d-fb50-40fa-a007-b8d574d64fa7",
       "name": "Write registry",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        3360,
+        3600,
         300
       ],
       "parameters": {
@@ -414,12 +438,12 @@
       }
     },
     {
-      "id": "dbea28ae-d605-4293-bb36-208ae1521946",
+      "id": "aa1cb049-c52d-4af3-a6ad-0b88b2e45fcb",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3600,
+        3840,
         300
       ],
       "parameters": {
@@ -427,16 +451,16 @@
       }
     },
     {
-      "id": "f877ca01-55fc-4d60-a166-04cbe71823b3",
+      "id": "a8b3646d-a615-4700-84e2-504bdf274e27",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        0,
+        240,
         0
       ],
       "parameters": {
-        "width": 1700,
+        "width": 1950,
         "height": 130,
         "content": "## AI Act Transparency Kit — deployer side of Article 50, as a module\nTwo entries: its own intake form, or **Execute Sub-workflow** from any production line (pass asset_type, language, model, prompt, operator, depicts_real_person, public_information, caller_workflow and the file as binary `data`). classify → label + manifest → **Wait-form human gate** (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."
       }
@@ -550,6 +574,17 @@
       ]
     },
     "Write manifest + inbox": {
+      "main": [
+        [
+          {
+            "node": "Notify reviewer (Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify reviewer (Slack)": {
       "main": [
         [
           {
