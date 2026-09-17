@@ -10,9 +10,10 @@ B=http://localhost:5678
 REVIEWER="${REVIEWER:-Ruslan Karymov}"
 PLACE=samples/real-place.jpg; [ -f "$PLACE" ] || PLACE=samples/presenter-frame.jpg
 PERSON=samples/real-person.jpg; [ -f "$PERSON" ] || PERSON=samples/presenter-frame.jpg
-# a "manipulated" version of the real place: a fake element pasted in with ffmpeg (no generative model needed for the demo)
+# a "manipulated" version of the real place: a piece of the right-hand building is cloned and pasted into the fog at the end
+# of the street, so a building that does not exist appears there (ffmpeg only; no generative model needed for the demo)
 if [ -f samples/real-place.jpg ] && [ ! -f samples/real-place-altered.jpg ]; then
-  ffmpeg -y -loglevel error -i samples/real-place.jpg -vf "drawbox=x=iw*0.55:y=ih*0.25:w=iw*0.18:h=ih*0.35:color=0x2b6cb0@0.9:t=fill,drawtext=fontfile=/System/Library/Fonts/Supplemental/Arial.ttf:text='NEW TOWER 2027':fontcolor=white:fontsize=h/30:x=iw*0.56:y=ih*0.27" samples/real-place-altered.jpg 2>/dev/null || cp samples/real-place.jpg samples/real-place-altered.jpg
+  ffmpeg -y -loglevel error -i samples/real-place.jpg -filter_complex "[0]crop=iw*0.22:ih*0.30:iw*0.76:ih*0.14,scale=iw*0.75:-1,format=rgba,colorchannelmixer=aa=0.55[b];[0][b]overlay=W*0.47:H*0.27" samples/real-place-altered.jpg || cp samples/real-place.jpg samples/real-place-altered.jpg
 fi
 ALTERED=samples/real-place-altered.jpg; [ -f "$ALTERED" ] || ALTERED=samples/presenter-frame.jpg
 

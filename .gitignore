@@ -8,3 +8,6 @@ __pycache__/
 # local database password and the n8n credential file built from it
 .env
 secrets/
+# the operator's own photo stays local
+samples/real-person.jpg
+docs/labelled-person.jpg
