@@ -3,7 +3,7 @@
 Importable n8n workflows that make EU AI Act transparency a property of the production line, not a report written before the audit.
 
 - **AI Act Transparency Kit** — a module any line calls with *Execute Sub-workflow* (or its own intake form): classification under Article 50 → label (ffmpeg) and provenance manifest → **human approval gate** (Wait node, form) → approval log → **AI-systems registry of the whole n8n instance with path analysis**: from every node that calls a model, every path forward to a node that reaches people, and what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller.
-- **Audit view** — `GET /webhook/audit`: assets awaiting a human (with gate links), the registry, synthetic media, generated text, the approval log. Filled from files the kit writes. Nothing on it is typed by hand.
+- **Audit view** — `GET /webhook/audit`: assets awaiting a human (with gate links), the registry, synthetic media, generated text, the approval log. Read from the Postgres ledger; the approval log is append-only and hash-chained, and the chain is verified on every render.
 - **Recycling notice · three voices** — a real line with the kit as a module: text → Kokoro-82M (local TTS, three stock voices) → AI Act gate → publish only what a human approved.
 - **Sample: social post drafter** — a marketing line without any gate, so the registry has something to flag.
 
@@ -23,6 +23,23 @@ The disclosure sentence is **fixed wording per language** (en, bg, ru, de) chose
 Every asset stops at the gate. The reviewer sees the category, the obligations, the consent reference, the labelled file or the text as it would be published, and chooses **Approve**, **Editorial exception** (text only) or **Return** with a reason.
 
 ![Human approval gate](docs/gate.png)
+
+## Storage: a ledger, not files
+
+Everything the auditor reads lives in Postgres (`db/schema.sql`): `assets` (one row per asset, the manifest as jsonb), `decisions` and `registry_snapshots`. Two rules are enforced by the database itself, not by the workflow:
+
+- **`decisions` is append-only.** A trigger refuses `UPDATE` and `DELETE`, even from the owner role.
+- **Every decision is hash-chained.** A `BEFORE INSERT` trigger computes `hash = sha256(prev_hash | asset | time | reviewer | decision | reason | status | responsible | artefact)`, so the application never chooses its own hash. `verify_chain()` recomputes the whole chain; the audit view runs it on every render and prints *chain verified* or the first broken row.
+- The registry is stored as a snapshot per run: history, not a file that gets overwritten.
+
+Only media files (incoming and labelled) stay on disk under `data/`. The kit keeps one Execute Command node, the ffmpeg label.
+
+## The gate: form or Slack
+
+`GATE_MODE` in `workflows/build.py`:
+
+- `form` (default) — a Wait node with a form. Works anywhere; the link is on the audit view and, if a Slack credential is attached, posted to `#ai-act-gate` by **Notify reviewer**. Reviewer identity is whatever the person types.
+- `slack` — Slack **Send and Wait** with the same form in the channel. Only channel members can answer, which is the practical identity control most teams have. Needs a Slack credential on the node; untested here until one is attached.
 
 ## Embedding the kit in a line
 
@@ -70,7 +87,7 @@ Stock n8n is a hardened image without a package manager, so the Dockerfile adds 
 
 ```bash
 docker build -t n8n-ffmpeg .
-./reload.sh        # first time only: wipes the local n8n, imports all workflows, publishes them
+./reload.sh        # first time only: starts Postgres + n8n on a Docker network, loads db/schema.sql, imports the DB credential and all workflows, publishes them
 ../teardown-engine/.venv/bin/python tools/kokoro_server.py --port 8880   # local TTS for the three-voices line (kokoro-onnx)
 ./demo.sh          # seeds four assets and four decisions through the intake form
 open http://localhost:5678/form/notice          # the three-voices line; gates appear on the audit view
@@ -79,14 +96,14 @@ open http://localhost:5678/webhook/audit        # audit view
 ./update.sh        # after editing workflows/build.py: re-import and publish, keeps owner, API key and credentials
 ```
 
-`reload.sh` deletes the Docker volume with the owner account, API key and credentials. Use `update.sh` for everything after the first run.
+`reload.sh` deletes both volumes: the n8n owner account, API key and credentials, and the ledger. Use `update.sh` for everything after the first run. The database password is generated into `.env` and `secrets/postgres-credential.json` on first run (both git-ignored); the credential id `KitPostgresCred01` is fixed so the workflow JSON can reference it.
 
 Environment the kit needs (already in `reload.sh`):
 
 | Variable | Why |
 |---|---|
 | `NODES_EXCLUDE=[]` | n8n 2.x disables the Execute Command node by default; the kit uses it for ffmpeg and file writes |
-| `N8N_RESTRICT_FILE_ACCESS_TO=/data` | the Read/Write File node may only touch the mounted data folder |
+| `N8N_RESTRICT_FILE_ACCESS_TO=/data` | the Read/Write File node may only touch the mounted media folder |
 | `N8N_RUNNERS_ENABLED=true` | Code nodes run in the task runner |
 
 The **AI-systems registry** lists every workflow on the instance through the n8n API. Create an API key in *Settings → n8n API* (scope `workflow:list` is enough), add an *n8n API* credential (base URL `http://localhost:5678/api/v1`) and attach it to the node **Read all workflows**, then publish. `workflows/build.py` carries the credential id of this instance so `update.sh` keeps the binding; on another instance attach it in the editor. Without it the node is skipped gracefully and the registry lists only the models declared in manifests.
@@ -101,7 +118,8 @@ workflows/host-line.json     the three-voices line with the kit as a module
 workflows/sample-line.json   a marketing line without a gate, for the registry to flag
 tools/kokoro_server.py       HTTP wrapper around Kokoro-82M for n8n
 workflows/audit_render.js    the auditor's page (inlined into the Code node)
-data/                        manifests/  approvals/  incoming/  labelled/  registry.json
+db/schema.sql                assets · decisions (append-only, hash-chained) · registry_snapshots · verify_chain()
+data/                        incoming/  labelled/  published/  (media only; the ledger is in Postgres)
 samples/                     synthetic test assets (ffmpeg testsrc), no people, no rights
 docs/                        screenshots and a static copy of the audit view
 reload.sh · update.sh · demo.sh · Dockerfile
@@ -132,7 +150,7 @@ Manifest example:
 The kit is built so that each part can be replaced without touching the rest:
 
 - **Gate** — the Wait-form gate can be replaced by Gmail, Slack or Telegram *Send and Wait*; the registry recognises both.
-- **Storage** — files under `/data` can be replaced by Google Sheets, Airtable or Notion nodes; the audit view reads whatever the collector returns.
+- **Storage** — the three Postgres nodes can point at any Postgres (managed or on-prem); the schema is one file.
 - **Label** — ffmpeg `drawtext` can be replaced by Bannerbear or the Edit Image node; audio keeps a metadata comment and a spoken or written disclosure at publication.
 - **Intake** — the form can be replaced by a webhook from the generation pipeline; field names stay the same.
 

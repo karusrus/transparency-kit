@@ -19,15 +19,22 @@ for name in ORDER:
     workflows.append(wf)
 
 registry = None
-reg_path = HERE / "data" / "registry.json"
-if reg_path.exists():
-    registry = json.loads(reg_path.read_text())
-    manifests = [json.loads(pathlib.Path(p).read_text()) for p in glob.glob(str(HERE / "data/manifests/*.json"))] if (HERE / "data/manifests").exists() else []
+# the registry lives in Postgres now: latest snapshot, plus counts for the Auditor block
+import subprocess
+def psql(sql):
+    try:
+        return subprocess.run(["docker", "exec", "kit-db", "psql", "-U", "kit", "-d", "kit", "-At", "-c", sql], capture_output=True, text=True, timeout=30).stdout.strip()
+    except Exception:
+        return ""
+raw = psql("select registry::text from registry_snapshots order by seq desc limit 1")
+if raw:
+    registry = json.loads(raw)
     registry["audit"] = {
-        "media": sum(1 for m in manifests if m.get("asset_type") != "text"),
-        "texts": sum(1 for m in manifests if m.get("asset_type") == "text"),
-        "approvals": len(glob.glob(str(HERE / "data/approvals/*.json"))),
-        "awaiting": len(glob.glob(str(HERE / "data/inbox/*.json"))),
+        "media": int(psql("select count(*) from assets where asset_type <> 'text'") or 0),
+        "texts": int(psql("select count(*) from assets where asset_type = 'text'") or 0),
+        "approvals": int(psql("select count(*) from decisions") or 0),
+        "awaiting": int(psql("select count(*) from assets where status = 'pending_review'") or 0),
+        "chain_ok": psql("select count(*) filter (where not ok) = 0 from verify_chain()") == "t",
     }
 
 bundle = {"workflows": workflows, "registry": registry, "note": "AI Act Transparency Kit · n8n workflows + registry with path analysis, for Pipeline Map (Import n8n)"}

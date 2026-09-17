@@ -4,3 +4,7 @@ data/
 workflows/*.bak*
 .DS_Store
 __pycache__/
+
+# local database password and the n8n credential file built from it
+.env
+secrets/

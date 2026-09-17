@@ -22,6 +22,16 @@ HOST_ID = "RecyclingVoices1"
 N8N_API_CREDENTIAL_ID = "57qykOiFfUipk1bM"
 N8N_API_CREDENTIAL_NAME = "n8n ruslan"
 KOKORO_URL = "http://host.docker.internal:8880/tts"
+# Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
+PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
+GATE_MODE = "form"          # "form": Wait node with a form (works everywhere) · "slack": Slack Send-and-Wait with the same form, channel members only
+SLACK_CHANNEL = "#ai-act-gate"
+
+
+def pg(name, query, values_expr, x, y, **extra):
+    """Postgres · Execute Query with $1..$n bound from an expression that returns an array."""
+    return node(name, "n8n-nodes-base.postgres", 2.7, {"operation": "executeQuery", "query": query,
+                "options": {"queryReplacement": values_expr}}, x, y, credentials=PG, **extra)
 
 
 def nid():
@@ -147,20 +157,15 @@ return [{ json: { ...m, disclosed_text: m.label_required ? m.text_content + foot
 """
 
 MANIFEST_JS = r"""
-// Collect everything into the manifest, add the gate link, encode files for shell-safe writes.
+// Collect everything into the manifest and add the gate link. The next node stores it in Postgres.
 const m = { ...$('Classify (Art. 50)').first().json };
 delete m.ext; delete m.ffmpeg_cmd; delete m.binary_key;
 const src = $input.first().json;
 if (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;
 if (src.exitCode !== undefined) { m.label_exit_code = src.exitCode; if (src.stderr) m.label_stderr = String(src.stderr).slice(0, 500); }
 m.gate_url = $execution.resumeFormUrl;
-const inbox = { id: m.id, line: m.line, asset_type: m.asset_type, category: m.category, model: m.model, operator: m.operator,
-                created_at: m.created_at, gate_url: m.gate_url, execution_id: $execution.id };
-const b64 = (o) => Buffer.from(JSON.stringify(o, null, 2)).toString('base64');
-const cmd = `mkdir -p /data/manifests /data/approvals /data/labelled /data/incoming /data/inbox`
-  + ` && printf %s ${b64(m)} | base64 -d > /data/manifests/${m.id}.json`
-  + ` && printf %s ${b64(inbox)} | base64 -d > /data/inbox/${m.id}.json`;
-return [{ json: { ...m, write_cmd: cmd } }];
+m.execution_id = $execution.id;
+return [{ json: m }];
 """
 
 RESOLVE_JS = r"""
@@ -191,11 +196,7 @@ const approval = {
   artefact: m.labelled_path || m.incoming_path || 'text',
   execution_id: $execution.id, workflow_id: $workflow.id,
 };
-const b64 = (o) => Buffer.from(JSON.stringify(o, null, 2)).toString('base64');
-const cmd = `printf %s ${b64(approval)} | base64 -d > /data/approvals/${m.id}.json`
-          + ` && printf %s ${b64(m)} | base64 -d > /data/manifests/${m.id}.json`
-          + ` && rm -f /data/inbox/${m.id}.json`;
-return [{ json: { ...m, approval, write_cmd: cmd } }];
+return [{ json: { ...m, approval } }];
 """
 
 REGISTRY_JS = r"""
@@ -300,12 +301,11 @@ function analyse(w) {
 const rows = [];
 for (const w of wfs) rows.push(...analyse(w));
 
-const raw = String($('Read manifests').first().json.stdout || '');
 const seen = new Map();
-for (const line of raw.split('\n')) {
-  const t = line.trim(); if (!t.startsWith('{')) continue;
+for (const row of $('Read assets').all()) {
   try {
-    const m = JSON.parse(t);
+    const m = typeof row.json.manifest === 'string' ? JSON.parse(row.json.manifest) : (row.json.manifest || {});
+    m.status = row.json.status || m.status; m.disclosure_status = row.json.disclosure_status || m.disclosure_status;
     const key = (m.model || '') + '|' + (m.model_version || '');
     if (!m.model) continue;
     if (seen.has(key)) { seen.get(key).assets += 1; continue; }
@@ -323,8 +323,7 @@ const registry = { generated_at: new Date().toISOString(), instance_workflows: w
                    workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),
                    rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',
                    systems: rows };
-const cmd = `printf %s ${Buffer.from(JSON.stringify(registry, null, 2)).toString('base64')} | base64 -d > /data/registry.json`;
-return [{ json: { systems: rows.length, workflows: wfs.length, write_cmd: cmd } }];
+return [{ json: { systems: rows.length, workflows: wfs.length, partial: wfs.length === 0, registry } }];
 """.replace('__KIT_ID__', KIT_ID)
 
 RETURN_JS = r"""
@@ -332,11 +331,10 @@ RETURN_JS = r"""
 const m = $('Resolve decision').first().json;
 return [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,
                   responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,
-                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: '/data/manifests/' + m.id + '.json',
+                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: 'assets/' + m.id + ' (Postgres)',
                   audit_view: 'http://localhost:5678/webhook/audit' } }];
 """
 
-READ_MANIFESTS_SH = "for f in /data/manifests/*.json; do [ -f \"$f\" ] && node -e 'process.stdout.write(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\")))+\"\\n\")' \"$f\"; done; true"
 
 GATE_HTML = ("={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));"
              " return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">'"
@@ -390,23 +388,32 @@ kit_nodes = [
     node("Label with ffmpeg", "n8n-nodes-base.executeCommand", 1, {
         "command": "={{ $('Classify (Art. 50)').first().json.ffmpeg_cmd || 'true' }}"}, X(5), 440),
     node("Build manifest", "n8n-nodes-base.code", 2, {"jsCode": MANIFEST_JS.strip()}, X(6), 300),
-    node("Write manifest + inbox", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(7), 300),
+    pg("Store asset", "insert into assets (id, line, asset_type, category, status, model, operator, language, gate_url, execution_id, manifest) values ($1,$2,$3,$4,'pending_review',$5,$6,$7,$8,$9,$10::jsonb) on conflict (id) do update set manifest = excluded.manifest, gate_url = excluded.gate_url, execution_id = excluded.execution_id",
+       "={{ [ $json.id, $json.line, $json.asset_type, $json.category, $json.model, $json.operator, $json.language, $json.gate_url, $json.execution_id, JSON.stringify($json) ] }}", X(7), 300),
     node("Notify reviewer (Slack)", "n8n-nodes-base.slack", 2.3, {
         "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": "#ai-act-gate"},
         "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
         "otherOptions": {}}, X(8), 160, onError="continueRegularOutput", notes="The human is told where the gate is. Attach a Slack credential and pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."),
+    (node("Review & approve", "n8n-nodes-base.slack", 2.7, {
+        "resource": "message", "operation": "sendAndWait", "select": "channel",
+        "channelId": {"__rl": True, "mode": "name", "value": SLACK_CHANNEL},
+        "message": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence }}",
+        "responseType": "customForm", "defineForm": "fields", "formFields": GATE_FIELDS, "options": {}},
+        X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001") if GATE_MODE == "slack" else
     node("Review & approve", "n8n-nodes-base.wait", 1.1, {
         "resume": "form", "formTitle": "Human approval gate",
         "formDescription": "One asset, one decision. Everything below was filled by the line.",
-        "formFields": GATE_FIELDS, "options": {}}, X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001"),
+        "formFields": GATE_FIELDS, "options": {}}, X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001")),
     node("Resolve decision", "n8n-nodes-base.code", 2, {"jsCode": RESOLVE_JS.strip()}, X(10), 300),
-    node("Write approval + manifest", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(11), 300),
-    node("Read manifests", "n8n-nodes-base.executeCommand", 1, {"command": READ_MANIFESTS_SH}, X(12), 300),
+    pg("Record decision", "with d as (insert into decisions (asset_id, reviewer, decision, reason, note, disclosure_status, responsible_person, artefact, execution_id, workflow_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning seq, hash) update assets a set status = $11, disclosure_status = $6, decided_at = now(), manifest = $12::jsonb from d where a.id = $1 returning d.seq, d.hash",
+       "={{ [ $json.id, $json.reviewer, $json.approval.decision, $json.approval.reason, $json.approval.note, $json.disclosure_status, $json.responsible_person, $json.approval.artefact, $json.approval.execution_id, $json.approval.workflow_id, $json.status, JSON.stringify(Object.fromEntries(Object.entries($json).filter(([k]) => k !== 'approval'))) ] }}", X(11), 300),
+    pg("Read assets", "select id, status, disclosure_status, manifest from assets order by created_at", "={{ [] }}", X(12), 300),
     node("Read all workflows", "n8n-nodes-base.n8n", 1, {"resource": "workflow", "operation": "getAll", "returnAll": True, "filters": {}},
-         X(13), 300, onError="continueRegularOutput", credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
+         X(13), 300, onError="continueRegularOutput", executeOnce=True, credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
     node("Registry rows", "n8n-nodes-base.code", 2, {"jsCode": REGISTRY_JS.strip()}, X(14), 300),
-    node("Write registry", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.write_cmd }}"}, X(15), 300),
+    pg("Snapshot registry", "insert into registry_snapshots (partial, systems, registry) values ($1, $2, $3::jsonb)",
+       "={{ [ $json.partial, $json.systems, JSON.stringify($json.registry) ] }}", X(15), 300),
     node("Return to caller", "n8n-nodes-base.code", 2, {"jsCode": RETURN_JS.strip()}, X(16), 300),
     node("How it works", "n8n-nodes-base.stickyNote", 1, {"width": 1950, "height": 130, "content":
         "## AI Act Transparency Kit — deployer side of Article 50, as a module\n"
@@ -419,32 +426,34 @@ kit_conn = wire(
     ("Prompt hash", "Classify (Art. 50)"), ("Classify (Art. 50)", "Is text?"),
     ("Is text?", "Text disclosure", 0), ("Is text?", "Save incoming file", 1),
     ("Text disclosure", "Build manifest"), ("Save incoming file", "Label with ffmpeg"), ("Label with ffmpeg", "Build manifest"),
-    ("Build manifest", "Write manifest + inbox"), ("Write manifest + inbox", "Notify reviewer (Slack)"), ("Notify reviewer (Slack)", "Review & approve"),
-    ("Review & approve", "Resolve decision"), ("Resolve decision", "Write approval + manifest"),
-    ("Write approval + manifest", "Read manifests"), ("Read manifests", "Read all workflows"),
-    ("Read all workflows", "Registry rows"), ("Registry rows", "Write registry"), ("Write registry", "Return to caller"),
+    ("Build manifest", "Store asset"), ("Store asset", "Notify reviewer (Slack)"), ("Notify reviewer (Slack)", "Review & approve"),
+    ("Review & approve", "Resolve decision"), ("Resolve decision", "Record decision"),
+    ("Record decision", "Read assets"), ("Read assets", "Read all workflows"),
+    ("Read all workflows", "Registry rows"), ("Registry rows", "Snapshot registry"), ("Snapshot registry", "Return to caller"),
 )
 kit = {"id": KIT_ID, "name": "AI Act Transparency Kit", "nodes": kit_nodes, "connections": kit_conn, "active": False,
        "settings": {"executionOrder": "v1", "saveManualExecutions": True}, "meta": {"templateCredsSetupCompleted": True}}
 
 # ============================================================================ audit view
-COLLECT_SH = ("echo '###REGISTRY'; [ -f /data/registry.json ] && cat /data/registry.json; echo; "
-              "for s in MANIFESTS:manifests APPROVALS:approvals INBOX:inbox; do echo \"###${s%%:*}\"; "
-              "for f in /data/${s#*:}/*.json; do [ -f \"$f\" ] && node -e 'process.stdout.write(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\")))+\"\\n\")' \"$f\"; done; done; true")
+LEDGER_SQL = ("select (select coalesce(json_agg(a order by a.created_at desc), '[]'::json) from assets a) as assets, "
+              "(select coalesce(json_agg(d order by d.seq desc), '[]'::json) from decisions d) as decisions, "
+              "(select registry from registry_snapshots order by seq desc limit 1) as registry, "
+              "(select count(*) from verify_chain() where not ok) as chain_broken, (select count(*) from decisions) as chain_len, "
+              "(select hash from decisions order by seq desc limit 1) as chain_head")
 RENDER_JS = (HERE / "audit_render.js").read_text()
 audit_nodes = [
     node("Audit request (GET)", "n8n-nodes-base.webhook", 2, {"path": "audit", "httpMethod": "GET", "responseMode": "responseNode", "options": {}},
          0, 300, webhookId="a1b2c3d4-0004-4000-8000-aiactaudit001"),
-    node("Collect files", "n8n-nodes-base.executeCommand", 1, {"command": COLLECT_SH}, 240, 300),
+    pg("Read the ledger", LEDGER_SQL, "={{ [] }}", 240, 300),
     node("Render audit view", "n8n-nodes-base.code", 2, {"jsCode": RENDER_JS.strip()}, 480, 300),
     node("Respond HTML", "n8n-nodes-base.respondToWebhook", 1.1, {
         "respondWith": "text", "responseBody": "={{ $json.html }}",
         "options": {"responseHeaders": {"entries": [{"name": "Content-Type", "value": "text/html; charset=utf-8"}]}}}, 720, 300),
     node("What this is", "n8n-nodes-base.stickyNote", 1, {"width": 900, "height": 100, "content":
-        "## Audit view — what an auditor reads instead of the pipeline\nAwaiting a human (gate links) · AI-systems registry with path analysis (Art. 4) · synthetic media & deepfakes (Art. 50(2), 50(4)) · generated public text (Art. 50(4) §2) · approval log (Art. 14, Art. 12 voluntary). Filled from files the kit writes; nothing here is typed by hand."}, 0, 120),
+        "## Audit view — what an auditor reads instead of the pipeline\nAwaiting a human (gate links) · AI-systems registry with path analysis (Art. 4) · synthetic media & deepfakes (Art. 50(2), 50(4)) · generated public text (Art. 50(4) §2) · approval log (Art. 14, Art. 12 voluntary). Read from the Postgres ledger; the approval log is append-only and hash-chained, verified on every render."}, 0, 120),
 ]
 audit = {"id": AUDIT_ID, "name": "AI Act Transparency Kit — Audit view", "nodes": audit_nodes,
-         "connections": wire(("Audit request (GET)", "Collect files"), ("Collect files", "Render audit view"), ("Render audit view", "Respond HTML")),
+         "connections": wire(("Audit request (GET)", "Read the ledger"), ("Read the ledger", "Render audit view"), ("Render audit view", "Respond HTML")),
          "active": False, "settings": {"executionOrder": "v1"}}
 
 # ============================================================================ host line: notice → three Kokoro voices → gate → publish

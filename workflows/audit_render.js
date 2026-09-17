@@ -1,17 +1,13 @@
-// Renders the auditor's page from the files the kit writes. Input: stdout of "Collect files".
-const raw = String($input.first().json.stdout || '');
-const sec = { REGISTRY: '', MANIFESTS: '', APPROVALS: '', INBOX: '' };
-let cur = null;
-for (const line of raw.split('\n')) {
-  const m = line.match(/^###(REGISTRY|MANIFESTS|APPROVALS|INBOX)\s*$/);
-  if (m) { cur = m[1]; continue; }
-  if (cur) sec[cur] += line + '\n';
-}
-const parseLines = (s) => s.split('\n').map(l => l.trim()).filter(l => l.startsWith('{')).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
-let registry = null; try { registry = JSON.parse(sec.REGISTRY.trim()); } catch (e) {}
-const manifests = parseLines(sec.MANIFESTS).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-const inbox = parseLines(sec.INBOX).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-const approvals = parseLines(sec.APPROVALS).sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)));
+// Renders the auditor's page from the ledger in Postgres. Input: one row from "Read the ledger".
+const row = $input.first().json || {};
+const J = (v, d) => { if (v === null || v === undefined) return d; if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return d; } } return v; };
+const assets = J(row.assets, []);
+const manifests = assets.map(a => ({ ...J(a.manifest, {}), status: a.status, disclosure_status: a.disclosure_status, gate_url: a.gate_url, created_at: a.created_at, decided_at: a.decided_at }))
+  .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+const inbox = manifests.filter(m => m.status === 'pending_review');
+const approvals = J(row.decisions, []).map(d => ({ ...d, id: d.asset_id, execution_id: d.execution_id }));
+const registry = J(row.registry, null);
+const chain = { len: Number(row.chain_len || 0), broken: Number(row.chain_broken || 0), head: row.chain_head || '' };
 
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dt = (v) => v ? esc(String(v).replace('T', ' ').slice(0, 16)) : '';
@@ -64,16 +60,17 @@ const blocks = [
   },
   {
     n: 4, title: 'Approval log', art: 'voluntary · Art. 26(6)-style record',
-    what: 'Who approved or returned what, when, and why. Human oversight as a property of the line. Record-keeping is mandatory only for high-risk systems (Art. 26(6)); this kit keeps it anyway. Reviewer identity is self-declared unless the gate is behind an authenticated channel.',
+    what: 'Who approved or returned what, when, and why. Append-only in Postgres: the database refuses updates and deletes, and every row carries the hash of the previous one. Record-keeping is mandatory only for high-risk systems (Art. 26(6)); this kit keeps it anyway. Reviewer identity is self-declared unless the gate is behind an authenticated channel.',
     body: table([
       ['Decided', r => dt(r.decided_at)], ['ID', r => `<code>${esc(r.id)}</code>`], ['Reviewer', r => esc(r.reviewer)],
       ['Decision', r => esc(r.decision)], ['Outcome', r => pill(r.disclosure_status)], ['Reason', r => esc(r.reason || r.note || '')],
-      ['Artefact', r => esc(r.artefact)], ['Execution', r => `<code>${esc(r.execution_id)}</code>`],
+      ['Artefact', r => esc(r.artefact)], ['Hash', r => `<code title="${esc(r.prev_hash)} → ${esc(r.hash)}">${esc(String(r.hash || '').slice(0, 10))}</code>`], ['Execution', r => `<code>${esc(r.execution_id)}</code>`],
     ], approvals),
   },
 ];
 
 const stat = (n, l) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`;
+const chainLine = chain.len ? `Ledger: ${chain.len} decisions in Postgres, append-only, hash-chained · ${chain.broken ? `<b style="color:var(--bad)">chain broken at ${chain.broken} row(s)</b>` : '<b style="color:var(--ok)">chain verified</b>'} · head <code>${esc(String(chain.head).slice(0, 16))}…</code>` : 'Ledger: no decisions yet.';
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Audit view · AI Act Transparency Kit</title>
 <style>
@@ -98,6 +95,6 @@ footer{padding:0 32px 40px;color:var(--mut);font-size:12px}
 <header><h1>Audit view · AI Act Transparency Kit</h1><p>What the auditor reads instead of the pipeline. Deployer obligations under the EU AI Act, filled automatically by the line. Generated ${dt(new Date().toISOString())}.</p></header>
 <div class="stats">${stat(systems.length, 'AI systems on the instance')}${stat(systems.filter(r => r.path_status === 'uncovered' || r.path_status === 'likeness').length, 'reach people uncovered')}${stat(systems.filter(r => r.path_status === 'editorial' || r.path_status === 'verify').length, 'need a decision')}${stat(media.length, 'synthetic media assets')}${stat(texts.length, 'generated texts')}${stat(approvals.length, 'decisions logged')}${stat(inbox.length, 'awaiting a human')}</div>
 <main>${inbox.length ? `<section><div class="hd"><span class="n">!</span><h2>Awaiting a human</h2><span class="art">the gate · a named person decides</span></div><p class="what">Assets stopped at the gate. Open the link, decide, and the row moves to the approval log.</p><div class="wrap">${table([['Since', r => dt(r.created_at)], ['Line', r => esc(r.line)], ['Asset', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)], ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Gate', r => `<a href="${esc(r.gate_url)}">open the gate →</a>`]], inbox)}</div></section>` : ''}${blocks.map(b => `<section><div class="hd"><span class="n">${b.n}</span><h2>${esc(b.title)}</h2><span class="art">${esc(b.art)}</span></div><p class="what">${esc(b.what)}</p><div class="wrap">${b.body}</div>${b.foot ? `<p class="foot">${b.foot}</p>` : ''}</section>`).join('')}</main>
-<footer>Scope: deployer duties under Article 50 (in force 2 Aug 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed. Sources: files under /data written by the “AI Act Transparency Kit” workflow.</footer>
+<footer>${chainLine}<br>Scope: deployer duties under Article 50 (in force 2 Aug 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed. Sources: files under /data written by the “AI Act Transparency Kit” workflow.</footer>
 </body></html>`;
 return [{ json: { html, systems: systems.length, manifests: manifests.length, approvals: approvals.length } }];

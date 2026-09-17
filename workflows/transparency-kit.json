@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "415389a7-920e-4d6b-8f00-acd14b8825a9",
+      "id": "440077cc-552d-46c8-ba60-60b6533f1e70",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -130,7 +130,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "fab12556-6a60-457d-b5ad-2ebd2d388b73",
+      "id": "31e67f3c-84d5-4af1-8665-81a04dbd3dec",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -143,7 +143,7 @@
       }
     },
     {
-      "id": "3c02b75f-814c-429f-9c13-7f7105ab5f63",
+      "id": "0d997f45-c3ae-4c3f-8932-50eb657eb821",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -159,7 +159,7 @@
       }
     },
     {
-      "id": "873979a6-ac38-4c26-8359-a83cfd0d16c0",
+      "id": "85bdbfc5-5e0c-4b23-9e07-5feea2c28441",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -172,7 +172,7 @@
       }
     },
     {
-      "id": "2b872266-a050-46f2-a255-84ffeb573f12",
+      "id": "774cebcf-67c1-4023-a0af-f5ef67ff680e",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -190,7 +190,7 @@
           },
           "conditions": [
             {
-              "id": "de8a5765-bc97-449c-93b2-b7e3fc98afa5",
+              "id": "4d81918f-fc15-45da-b892-724d6201d267",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -205,7 +205,7 @@
       }
     },
     {
-      "id": "637fa03d-0b51-41a7-9133-3fce10ca1e1c",
+      "id": "aa9d1016-eb95-460e-b429-fdb0ec00a3b3",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -218,7 +218,7 @@
       }
     },
     {
-      "id": "71dcc1ae-d72a-4401-9257-6222c6465b9c",
+      "id": "6184223f-5b8e-46b7-8be8-820dadbbb9c5",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -234,7 +234,7 @@
       }
     },
     {
-      "id": "b1322668-92f6-4cda-8512-5ff2d07dc994",
+      "id": "3efa4419-3e49-46f5-9f44-7732ec26df8a",
       "name": "Label with ffmpeg",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -247,7 +247,7 @@
       }
     },
     {
-      "id": "aeca1933-f045-45ce-b07b-33168dd48343",
+      "id": "9acd7ed8-d2ae-47b3-8127-2fa6cf8bafc9",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -256,24 +256,34 @@
         300
       ],
       "parameters": {
-        "jsCode": "// Collect everything into the manifest, add the gate link, encode files for shell-safe writes.\nconst m = { ...$('Classify (Art. 50)').first().json };\ndelete m.ext; delete m.ffmpeg_cmd; delete m.binary_key;\nconst src = $input.first().json;\nif (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;\nif (src.exitCode !== undefined) { m.label_exit_code = src.exitCode; if (src.stderr) m.label_stderr = String(src.stderr).slice(0, 500); }\nm.gate_url = $execution.resumeFormUrl;\nconst inbox = { id: m.id, line: m.line, asset_type: m.asset_type, category: m.category, model: m.model, operator: m.operator,\n                created_at: m.created_at, gate_url: m.gate_url, execution_id: $execution.id };\nconst b64 = (o) => Buffer.from(JSON.stringify(o, null, 2)).toString('base64');\nconst cmd = `mkdir -p /data/manifests /data/approvals /data/labelled /data/incoming /data/inbox`\n  + ` && printf %s ${b64(m)} | base64 -d > /data/manifests/${m.id}.json`\n  + ` && printf %s ${b64(inbox)} | base64 -d > /data/inbox/${m.id}.json`;\nreturn [{ json: { ...m, write_cmd: cmd } }];"
+        "jsCode": "// Collect everything into the manifest and add the gate link. The next node stores it in Postgres.\nconst m = { ...$('Classify (Art. 50)').first().json };\ndelete m.ext; delete m.ffmpeg_cmd; delete m.binary_key;\nconst src = $input.first().json;\nif (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;\nif (src.exitCode !== undefined) { m.label_exit_code = src.exitCode; if (src.stderr) m.label_stderr = String(src.stderr).slice(0, 500); }\nm.gate_url = $execution.resumeFormUrl;\nm.execution_id = $execution.id;\nreturn [{ json: m }];"
       }
     },
     {
-      "id": "7b15547c-994b-49ca-9d26-a96dc7dc6f8a",
-      "name": "Write manifest + inbox",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "6c617203-8afb-42ad-b899-adaffbac62a4",
+      "name": "Store asset",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
       "position": [
         1680,
         300
       ],
       "parameters": {
-        "command": "={{ $json.write_cmd }}"
+        "operation": "executeQuery",
+        "query": "insert into assets (id, line, asset_type, category, status, model, operator, language, gate_url, execution_id, manifest) values ($1,$2,$3,$4,'pending_review',$5,$6,$7,$8,$9,$10::jsonb) on conflict (id) do update set manifest = excluded.manifest, gate_url = excluded.gate_url, execution_id = excluded.execution_id",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $json.line, $json.asset_type, $json.category, $json.model, $json.operator, $json.language, $json.gate_url, $json.execution_id, JSON.stringify($json) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KitPostgresCred01",
+          "name": "kit-db"
+        }
       }
     },
     {
-      "id": "bfa7b5d8-f635-45dd-9d48-f742eb1d2a81",
+      "id": "abbd1221-870a-4716-8794-98e6a4093884",
       "name": "Notify reviewer (Slack)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
@@ -297,7 +307,7 @@
       "notes": "The human is told where the gate is. Attach a Slack credential and pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
     },
     {
-      "id": "03368fe6-1a1a-4d30-90ad-dc8bfb9805a7",
+      "id": "db86d26b-4457-4af1-bf41-ee159d5da8e1",
       "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -350,7 +360,7 @@
       "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "b5352cc6-5b5e-4c70-9e7c-663889f83ec1",
+      "id": "691fe426-9dce-408c-8a6c-f9ee159fd1e4",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -359,37 +369,57 @@
         300
       ],
       "parameters": {
-        "jsCode": "// Turn the reviewer's decision into a disclosure status and an approval record.\nconst m = { ...$('Build manifest').first().json };\ndelete m.write_cmd;\nconst g = $input.first().json;\nconst decision = String(g.Decision || '');\nconst reviewer = String(g.Reviewer || '');\nconst reason = String(g['Reason / note'] || '');\nlet status, disclosure, responsible = null, note = '';\nif (decision.startsWith('Approve')) {\n  status = 'approved';\n  disclosure = m.label_required ? 'disclosed' : 'not_required';\n} else if (decision.startsWith('Editorial')) {\n  status = 'approved';\n  if (m.category === 'generated_public_text') { disclosure = 'editorial_exception'; responsible = reviewer; m.disclosed_text = m.text_content; }\n  else { disclosure = m.label_required ? 'disclosed' : 'not_required'; note = 'Editorial exception applies to text only (Art. 50(4) §2); label kept.'; }\n} else {\n  status = 'returned'; disclosure = 'returned';\n}\nm.status = status; m.disclosure_status = disclosure; m.responsible_person = responsible;\nm.decided_at = new Date().toISOString(); m.reviewer = reviewer;\nconst approval = {\n  id: m.id, line: m.line, decided_at: m.decided_at, reviewer, decision, reason, note,\n  category: m.category, asset_type: m.asset_type, model: m.model,\n  disclosure_status: disclosure, responsible_person: responsible,\n  artefact: m.labelled_path || m.incoming_path || 'text',\n  execution_id: $execution.id, workflow_id: $workflow.id,\n};\nconst b64 = (o) => Buffer.from(JSON.stringify(o, null, 2)).toString('base64');\nconst cmd = `printf %s ${b64(approval)} | base64 -d > /data/approvals/${m.id}.json`\n          + ` && printf %s ${b64(m)} | base64 -d > /data/manifests/${m.id}.json`\n          + ` && rm -f /data/inbox/${m.id}.json`;\nreturn [{ json: { ...m, approval, write_cmd: cmd } }];"
+        "jsCode": "// Turn the reviewer's decision into a disclosure status and an approval record.\nconst m = { ...$('Build manifest').first().json };\ndelete m.write_cmd;\nconst g = $input.first().json;\nconst decision = String(g.Decision || '');\nconst reviewer = String(g.Reviewer || '');\nconst reason = String(g['Reason / note'] || '');\nlet status, disclosure, responsible = null, note = '';\nif (decision.startsWith('Approve')) {\n  status = 'approved';\n  disclosure = m.label_required ? 'disclosed' : 'not_required';\n} else if (decision.startsWith('Editorial')) {\n  status = 'approved';\n  if (m.category === 'generated_public_text') { disclosure = 'editorial_exception'; responsible = reviewer; m.disclosed_text = m.text_content; }\n  else { disclosure = m.label_required ? 'disclosed' : 'not_required'; note = 'Editorial exception applies to text only (Art. 50(4) §2); label kept.'; }\n} else {\n  status = 'returned'; disclosure = 'returned';\n}\nm.status = status; m.disclosure_status = disclosure; m.responsible_person = responsible;\nm.decided_at = new Date().toISOString(); m.reviewer = reviewer;\nconst approval = {\n  id: m.id, line: m.line, decided_at: m.decided_at, reviewer, decision, reason, note,\n  category: m.category, asset_type: m.asset_type, model: m.model,\n  disclosure_status: disclosure, responsible_person: responsible,\n  artefact: m.labelled_path || m.incoming_path || 'text',\n  execution_id: $execution.id, workflow_id: $workflow.id,\n};\nreturn [{ json: { ...m, approval } }];"
       }
     },
     {
-      "id": "9e8beba7-7533-49f3-bc9a-62c289ea3d77",
-      "name": "Write approval + manifest",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "8dcc6aea-8a85-4fd6-93bc-bfd3973af6ba",
+      "name": "Record decision",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
       "position": [
         2640,
         300
       ],
       "parameters": {
-        "command": "={{ $json.write_cmd }}"
+        "operation": "executeQuery",
+        "query": "with d as (insert into decisions (asset_id, reviewer, decision, reason, note, disclosure_status, responsible_person, artefact, execution_id, workflow_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning seq, hash) update assets a set status = $11, disclosure_status = $6, decided_at = now(), manifest = $12::jsonb from d where a.id = $1 returning d.seq, d.hash",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $json.reviewer, $json.approval.decision, $json.approval.reason, $json.approval.note, $json.disclosure_status, $json.responsible_person, $json.approval.artefact, $json.approval.execution_id, $json.approval.workflow_id, $json.status, JSON.stringify(Object.fromEntries(Object.entries($json).filter(([k]) => k !== 'approval'))) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KitPostgresCred01",
+          "name": "kit-db"
+        }
       }
     },
     {
-      "id": "8c23b511-1036-49d3-a1c2-df9816d6141d",
-      "name": "Read manifests",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "54431b41-9c6c-4f7c-8d4e-56f556bcb4c0",
+      "name": "Read assets",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
       "position": [
         2880,
         300
       ],
       "parameters": {
-        "command": "for f in /data/manifests/*.json; do [ -f \"$f\" ] && node -e 'process.stdout.write(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\")))+\"\\n\")' \"$f\"; done; true"
+        "operation": "executeQuery",
+        "query": "select id, status, disclosure_status, manifest from assets order by created_at",
+        "options": {
+          "queryReplacement": "={{ [] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KitPostgresCred01",
+          "name": "kit-db"
+        }
       }
     },
     {
-      "id": "d47fe9ed-9d0f-45d4-908b-36e9de96d677",
+      "id": "d96a0ab6-bbab-4160-95f9-17c0ca4d8694",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
@@ -404,6 +434,7 @@
         "filters": {}
       },
       "onError": "continueRegularOutput",
+      "executeOnce": true,
       "credentials": {
         "n8nApi": {
           "id": "57qykOiFfUipk1bM",
@@ -412,7 +443,7 @@
       }
     },
     {
-      "id": "733a1302-9af7-4b12-bf72-8fed75b18ff3",
+      "id": "c617e6a8-8805-4183-9715-df358c34d617",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -421,24 +452,34 @@
         300
       ],
       "parameters": {
-        "jsCode": "// AI-systems registry for the whole n8n instance, with path analysis per generator.\n// Source 1: every workflow on the instance (n8n API). For each node that calls a model, walk every path forward\n//           to every node that reaches people and check what stands in between.\n// Source 2: models declared in manifests (generation often happens outside n8n).\nconst KIT_ID = 'AiActTransparenc';\nconst wfs = $input.all().map(i => i.json).filter(w => w && Array.isArray(w.nodes));\n\nconst AI_TYPE = /langchain|openai|anthropic|ollama|gemini|mistral|huggingface|groq|cohere|deepseek|perplexity|xai|elevenlabs|replicate|stability|bedrock|vertex|azureopenai|heygen|midjourney|runway|bannerbear|kokoro/i;\nconst AI_HOST = /api\\.openai\\.com|api\\.anthropic\\.com|:11434|:8880|kokoro|api\\.elevenlabs\\.io|api\\.replicate\\.com|api\\.stability\\.ai|generativelanguage\\.googleapis|api\\.mistral\\.ai|api\\.heygen\\.com|api\\.bannerbear\\.com|api\\.groq\\.com|api\\.cohere|api\\.deepseek\\.com|api\\.x\\.ai|openrouter\\.ai|api\\.d-id\\.com|api\\.synthesia\\.io/i;\nconst LIKENESS = /elevenlabs|heygen|d-id|synthesia|voice.?clone|clone/i;             // can reproduce a real face or voice\nconst EXIT_TYPE = /linkedIn|twitter|facebook|instagram|youTube|tiktok|wordpress|ghost|webflow|contentful|mailchimp|brevo|sendinblue|sendgrid|mailgun|emailSend|gmail|microsoftOutlook|telegram|whatsApp|twilio|messageBird|discord|reddit|medium|hubspot|activeCampaign|klaviyo/i;\nconst GATE_TYPE = /n8n-nodes-base\\.form$|n8n-nodes-base\\.wait$/;\nconst GATE_OP = /sendAndWait|approval/i;\nconst NAME_EXIT = /\\[exit\\]/i;               // convention: tag your own publishing nodes\nconst NAME_DISCLOSE = /\\[ai disclosure\\]/i;  // convention: tag your own disclosure/label nodes\n\nfunction classify(n) {\n  const p = n.parameters || {};\n  const url = typeof p.url === 'string' ? p.url : '';\n  const isKit = /executeWorkflow$/.test(n.type) && JSON.stringify(p.workflowId || '').includes(KIT_ID);\n  const gen = AI_TYPE.test(n.type) || AI_HOST.test(url);\n  const waitsForPerson = /n8n-nodes-base\\.wait$/.test(n.type) ? ['form', 'webhook'].includes(String(p.resume || '')) : true;   // a timer is not a human\n  const gate = isKit || (GATE_TYPE.test(n.type) && waitsForPerson) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));\n  const disclose = isKit || NAME_DISCLOSE.test(n.name);\n  const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);\n  const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\\.docker\\.internal|localhost|127\\.0\\.0\\.1/.test(url))\n                    || /slack|notion|googleSheets|airtable|microsoftTeams|mattermost/i.test(n.type));\n  return { gen, gate, disclose, exit, maybeExit, isKit, likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };\n}\n\nfunction modelOf(n) {\n  const p = n.parameters || {};\n  let model = (p.model && (p.model.value || p.model)) || (p.modelId && (p.modelId.value || p.modelId)) || '';\n  if (!model && typeof p.jsonBody === 'string') { const mm = p.jsonBody.match(/model['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]/); if (mm) model = mm[1]; }\n  if (!model && typeof p.url === 'string' && p.url) model = p.url.replace(/^https?:\\/\\//, '').split('/')[0];\n  return String(model);\n}\n\nfunction analyse(w) {\n  const nodes = w.nodes.filter(n => !/stickyNote$/.test(n.type));\n  const byName = Object.fromEntries(nodes.map(n => [n.name, n]));\n  const cls = Object.fromEntries(nodes.map(n => [n.name, classify(n)]));\n  const outs = (name) => {\n    const c = (w.connections || {})[name];\n    if (!c || !Array.isArray(c.main)) return [];\n    return c.main.map((edges, idx) => (edges || []).map(e => e && e.node).filter(t => t && byName[t]).map(t => ({ t, idx })));\n  };\n  const next = (name) => outs(name).flat().map(o => o.t);\n  const isLoop = (name) => /splitInBatches$/.test(byName[name].type);\n  // what the loop body (output 1, back to the loop node) passes through\n  const bodyFlags = (loop) => {\n    let gate = false, disc = false; const seen = new Set([loop]);\n    const stack = (outs(loop)[1] || []).map(o => o.t);\n    while (stack.length) {\n      const x = stack.pop(); if (seen.has(x)) continue; seen.add(x);\n      if (!byName[x].disabled) { gate = gate || cls[x].gate; disc = disc || cls[x].disclose; }\n      for (const y of next(x)) if (!seen.has(y)) stack.push(y);\n    }\n    return { gate, disc };\n  };\n  const rows = [];\n  for (const n of nodes) {\n    const c = cls[n.name];\n    if (!c.gen || n.disabled) continue;\n    // enumerate paths forward (capped), remembering what each path passed through\n    const paths = [];\n    const walk = (name, seen, gate, disc, trail) => {\n      if (paths.length > 300) return;\n      const loopBody = isLoop(name) ? bodyFlags(name) : null;\n      for (const { t, idx } of outs(name).flat()) {\n        if (seen.has(t)) continue;\n        const tc = cls[t]; const dn = byName[t].disabled;\n        let g2 = gate || (!dn && tc.gate), d2 = disc || (!dn && tc.disclose);\n        if (loopBody && idx === 0) { g2 = g2 || loopBody.gate; d2 = d2 || loopBody.disc; }   // \"done\" output: items went through the body\n        const trail2 = trail.concat(t);\n        if (tc.exit || tc.maybeExit) paths.push({ exit: t, kind: tc.exit ? 'exit' : 'maybe', gate: g2, disc: d2, trail: trail2 });\n        walk(t, new Set([...seen, t]), g2, d2, trail2);\n      }\n    };\n    walk(n.name, new Set([n.name]), false, false, [n.name]);\n    const real = paths.filter(p => p.kind === 'exit'), maybe = paths.filter(p => p.kind === 'maybe');\n    let status, evidence;\n    const fmt = (p) => p.trail.join(' → ');\n    if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }\n    else if (real.some(p => !p.disc && !p.gate)) { const p = real.find(p => !p.disc && !p.gate); status = 'uncovered'; evidence = fmt(p) + ' — no disclosure, no human gate on this path'; }\n    else if (c.likeness && real.some(p => !p.disc)) { const p = real.find(p => !p.disc); status = 'likeness'; evidence = fmt(p) + ' — face/voice generator reaches people without a disclosure step (gate alone is not enough for Art. 50(4) §1)'; }\n    else if (real.length && real.every(p => p.disc)) { status = 'disclosed'; evidence = fmt(real[0]); }\n    else if (real.length && real.every(p => p.disc || p.gate)) { const p = real.find(p => !p.disc); status = 'editorial'; evidence = fmt(p) + ' — human gate but no disclosure step: allowed for text only, with a named responsible person'; }\n    else { status = 'verify'; evidence = fmt(maybe[0]) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    if (status === 'disclosed' && maybe.some(p => !p.disc && !p.gate)) { status = 'verify'; evidence = fmt(maybe.find(p => !p.disc && !p.gate)) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    rows.push({ system: n.name, source: 'workflow node', workflow: w.name, workflow_id: w.id, workflow_active: !!w.active,\n                node_type: n.type.replace('@n8n/n8n-nodes-langchain.', 'langchain.').replace('n8n-nodes-base.', ''), model: modelOf(n),\n                role: 'deployer', likeness: c.likeness, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),\n                path_status: status, evidence, first_seen: new Date().toISOString().slice(0,10) });\n  }\n  return rows;\n}\n\nconst rows = [];\nfor (const w of wfs) rows.push(...analyse(w));\n\nconst raw = String($('Read manifests').first().json.stdout || '');\nconst seen = new Map();\nfor (const line of raw.split('\\n')) {\n  const t = line.trim(); if (!t.startsWith('{')) continue;\n  try {\n    const m = JSON.parse(t);\n    const key = (m.model || '') + '|' + (m.model_version || '');\n    if (!m.model) continue;\n    if (seen.has(key)) { seen.get(key).assets += 1; continue; }\n    seen.set(key, { system: m.model + (m.model_version ? ' ' + m.model_version : ''), source: 'declared in manifest', workflow: m.line || 'outside n8n', workflow_active: null,\n                    node_type: 'external generator', model: m.model, role: 'deployer', exits: [],\n                    path_status: m.status === 'pending_review' ? 'verify' : (m.disclosure_status === 'disclosed' || m.disclosure_status === 'editorial_exception' || m.disclosure_status === 'not_required') ? 'disclosed' : m.disclosure_status === 'returned' ? 'internal' : 'verify',\n                    evidence: 'declared at intake, passed through this kit (' + m.asset_type + '), decision: ' + (m.disclosure_status || m.status),\n                    first_seen: String(m.created_at || '').slice(0,10), assets: 1 });\n  } catch (e) {}\n}\nrows.push(...seen.values());\nconst order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };\nrows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));\nconst registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length, registry_partial: wfs.length === 0,\n                   workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),\n                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',\n                   systems: rows };\nconst cmd = `printf %s ${Buffer.from(JSON.stringify(registry, null, 2)).toString('base64')} | base64 -d > /data/registry.json`;\nreturn [{ json: { systems: rows.length, workflows: wfs.length, write_cmd: cmd } }];"
+        "jsCode": "// AI-systems registry for the whole n8n instance, with path analysis per generator.\n// Source 1: every workflow on the instance (n8n API). For each node that calls a model, walk every path forward\n//           to every node that reaches people and check what stands in between.\n// Source 2: models declared in manifests (generation often happens outside n8n).\nconst KIT_ID = 'AiActTransparenc';\nconst wfs = $input.all().map(i => i.json).filter(w => w && Array.isArray(w.nodes));\n\nconst AI_TYPE = /langchain|openai|anthropic|ollama|gemini|mistral|huggingface|groq|cohere|deepseek|perplexity|xai|elevenlabs|replicate|stability|bedrock|vertex|azureopenai|heygen|midjourney|runway|bannerbear|kokoro/i;\nconst AI_HOST = /api\\.openai\\.com|api\\.anthropic\\.com|:11434|:8880|kokoro|api\\.elevenlabs\\.io|api\\.replicate\\.com|api\\.stability\\.ai|generativelanguage\\.googleapis|api\\.mistral\\.ai|api\\.heygen\\.com|api\\.bannerbear\\.com|api\\.groq\\.com|api\\.cohere|api\\.deepseek\\.com|api\\.x\\.ai|openrouter\\.ai|api\\.d-id\\.com|api\\.synthesia\\.io/i;\nconst LIKENESS = /elevenlabs|heygen|d-id|synthesia|voice.?clone|clone/i;             // can reproduce a real face or voice\nconst EXIT_TYPE = /linkedIn|twitter|facebook|instagram|youTube|tiktok|wordpress|ghost|webflow|contentful|mailchimp|brevo|sendinblue|sendgrid|mailgun|emailSend|gmail|microsoftOutlook|telegram|whatsApp|twilio|messageBird|discord|reddit|medium|hubspot|activeCampaign|klaviyo/i;\nconst GATE_TYPE = /n8n-nodes-base\\.form$|n8n-nodes-base\\.wait$/;\nconst GATE_OP = /sendAndWait|approval/i;\nconst NAME_EXIT = /\\[exit\\]/i;               // convention: tag your own publishing nodes\nconst NAME_DISCLOSE = /\\[ai disclosure\\]/i;  // convention: tag your own disclosure/label nodes\n\nfunction classify(n) {\n  const p = n.parameters || {};\n  const url = typeof p.url === 'string' ? p.url : '';\n  const isKit = /executeWorkflow$/.test(n.type) && JSON.stringify(p.workflowId || '').includes(KIT_ID);\n  const gen = AI_TYPE.test(n.type) || AI_HOST.test(url);\n  const waitsForPerson = /n8n-nodes-base\\.wait$/.test(n.type) ? ['form', 'webhook'].includes(String(p.resume || '')) : true;   // a timer is not a human\n  const gate = isKit || (GATE_TYPE.test(n.type) && waitsForPerson) || GATE_OP.test(String(p.operation || '')) || GATE_OP.test(String(p.resource || ''));\n  const disclose = isKit || NAME_DISCLOSE.test(n.name);\n  const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);\n  const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\\.docker\\.internal|localhost|127\\.0\\.0\\.1/.test(url))\n                    || /slack|notion|googleSheets|airtable|microsoftTeams|mattermost/i.test(n.type));\n  return { gen, gate, disclose, exit, maybeExit, isKit, likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };\n}\n\nfunction modelOf(n) {\n  const p = n.parameters || {};\n  let model = (p.model && (p.model.value || p.model)) || (p.modelId && (p.modelId.value || p.modelId)) || '';\n  if (!model && typeof p.jsonBody === 'string') { const mm = p.jsonBody.match(/model['\"]?\\s*:\\s*['\"]([^'\"]+)['\"]/); if (mm) model = mm[1]; }\n  if (!model && typeof p.url === 'string' && p.url) model = p.url.replace(/^https?:\\/\\//, '').split('/')[0];\n  return String(model);\n}\n\nfunction analyse(w) {\n  const nodes = w.nodes.filter(n => !/stickyNote$/.test(n.type));\n  const byName = Object.fromEntries(nodes.map(n => [n.name, n]));\n  const cls = Object.fromEntries(nodes.map(n => [n.name, classify(n)]));\n  const outs = (name) => {\n    const c = (w.connections || {})[name];\n    if (!c || !Array.isArray(c.main)) return [];\n    return c.main.map((edges, idx) => (edges || []).map(e => e && e.node).filter(t => t && byName[t]).map(t => ({ t, idx })));\n  };\n  const next = (name) => outs(name).flat().map(o => o.t);\n  const isLoop = (name) => /splitInBatches$/.test(byName[name].type);\n  // what the loop body (output 1, back to the loop node) passes through\n  const bodyFlags = (loop) => {\n    let gate = false, disc = false; const seen = new Set([loop]);\n    const stack = (outs(loop)[1] || []).map(o => o.t);\n    while (stack.length) {\n      const x = stack.pop(); if (seen.has(x)) continue; seen.add(x);\n      if (!byName[x].disabled) { gate = gate || cls[x].gate; disc = disc || cls[x].disclose; }\n      for (const y of next(x)) if (!seen.has(y)) stack.push(y);\n    }\n    return { gate, disc };\n  };\n  const rows = [];\n  for (const n of nodes) {\n    const c = cls[n.name];\n    if (!c.gen || n.disabled) continue;\n    // enumerate paths forward (capped), remembering what each path passed through\n    const paths = [];\n    const walk = (name, seen, gate, disc, trail) => {\n      if (paths.length > 300) return;\n      const loopBody = isLoop(name) ? bodyFlags(name) : null;\n      for (const { t, idx } of outs(name).flat()) {\n        if (seen.has(t)) continue;\n        const tc = cls[t]; const dn = byName[t].disabled;\n        let g2 = gate || (!dn && tc.gate), d2 = disc || (!dn && tc.disclose);\n        if (loopBody && idx === 0) { g2 = g2 || loopBody.gate; d2 = d2 || loopBody.disc; }   // \"done\" output: items went through the body\n        const trail2 = trail.concat(t);\n        if (tc.exit || tc.maybeExit) paths.push({ exit: t, kind: tc.exit ? 'exit' : 'maybe', gate: g2, disc: d2, trail: trail2 });\n        walk(t, new Set([...seen, t]), g2, d2, trail2);\n      }\n    };\n    walk(n.name, new Set([n.name]), false, false, [n.name]);\n    const real = paths.filter(p => p.kind === 'exit'), maybe = paths.filter(p => p.kind === 'maybe');\n    let status, evidence;\n    const fmt = (p) => p.trail.join(' → ');\n    if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }\n    else if (real.some(p => !p.disc && !p.gate)) { const p = real.find(p => !p.disc && !p.gate); status = 'uncovered'; evidence = fmt(p) + ' — no disclosure, no human gate on this path'; }\n    else if (c.likeness && real.some(p => !p.disc)) { const p = real.find(p => !p.disc); status = 'likeness'; evidence = fmt(p) + ' — face/voice generator reaches people without a disclosure step (gate alone is not enough for Art. 50(4) §1)'; }\n    else if (real.length && real.every(p => p.disc)) { status = 'disclosed'; evidence = fmt(real[0]); }\n    else if (real.length && real.every(p => p.disc || p.gate)) { const p = real.find(p => !p.disc); status = 'editorial'; evidence = fmt(p) + ' — human gate but no disclosure step: allowed for text only, with a named responsible person'; }\n    else { status = 'verify'; evidence = fmt(maybe[0]) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    if (status === 'disclosed' && maybe.some(p => !p.disc && !p.gate)) { status = 'verify'; evidence = fmt(maybe.find(p => !p.disc && !p.gate)) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }\n    rows.push({ system: n.name, source: 'workflow node', workflow: w.name, workflow_id: w.id, workflow_active: !!w.active,\n                node_type: n.type.replace('@n8n/n8n-nodes-langchain.', 'langchain.').replace('n8n-nodes-base.', ''), model: modelOf(n),\n                role: 'deployer', likeness: c.likeness, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),\n                path_status: status, evidence, first_seen: new Date().toISOString().slice(0,10) });\n  }\n  return rows;\n}\n\nconst rows = [];\nfor (const w of wfs) rows.push(...analyse(w));\n\nconst seen = new Map();\nfor (const row of $('Read assets').all()) {\n  try {\n    const m = typeof row.json.manifest === 'string' ? JSON.parse(row.json.manifest) : (row.json.manifest || {});\n    m.status = row.json.status || m.status; m.disclosure_status = row.json.disclosure_status || m.disclosure_status;\n    const key = (m.model || '') + '|' + (m.model_version || '');\n    if (!m.model) continue;\n    if (seen.has(key)) { seen.get(key).assets += 1; continue; }\n    seen.set(key, { system: m.model + (m.model_version ? ' ' + m.model_version : ''), source: 'declared in manifest', workflow: m.line || 'outside n8n', workflow_active: null,\n                    node_type: 'external generator', model: m.model, role: 'deployer', exits: [],\n                    path_status: m.status === 'pending_review' ? 'verify' : (m.disclosure_status === 'disclosed' || m.disclosure_status === 'editorial_exception' || m.disclosure_status === 'not_required') ? 'disclosed' : m.disclosure_status === 'returned' ? 'internal' : 'verify',\n                    evidence: 'declared at intake, passed through this kit (' + m.asset_type + '), decision: ' + (m.disclosure_status || m.status),\n                    first_seen: String(m.created_at || '').slice(0,10), assets: 1 });\n  } catch (e) {}\n}\nrows.push(...seen.values());\nconst order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };\nrows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));\nconst registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length, registry_partial: wfs.length === 0,\n                   workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),\n                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',\n                   systems: rows };\nreturn [{ json: { systems: rows.length, workflows: wfs.length, partial: wfs.length === 0, registry } }];"
       }
     },
     {
-      "id": "e788653d-fb50-40fa-a007-b8d574d64fa7",
-      "name": "Write registry",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "03730788-0e72-4d38-916c-672b3962e2fe",
+      "name": "Snapshot registry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
       "position": [
         3600,
         300
       ],
       "parameters": {
-        "command": "={{ $json.write_cmd }}"
+        "operation": "executeQuery",
+        "query": "insert into registry_snapshots (partial, systems, registry) values ($1, $2, $3::jsonb)",
+        "options": {
+          "queryReplacement": "={{ [ $json.partial, $json.systems, JSON.stringify($json.registry) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KitPostgresCred01",
+          "name": "kit-db"
+        }
       }
     },
     {
-      "id": "aa1cb049-c52d-4af3-a6ad-0b88b2e45fcb",
+      "id": "2e2a42e4-1a4e-4d8b-89f8-07dd2c5a22c2",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -447,11 +488,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// What a calling workflow gets back, one item per asset.\nconst m = $('Resolve decision').first().json;\nreturn [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,\n                  responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,\n                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: '/data/manifests/' + m.id + '.json',\n                  audit_view: 'http://localhost:5678/webhook/audit' } }];"
+        "jsCode": "// What a calling workflow gets back, one item per asset.\nconst m = $('Resolve decision').first().json;\nreturn [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,\n                  responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,\n                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: 'assets/' + m.id + ' (Postgres)',\n                  audit_view: 'http://localhost:5678/webhook/audit' } }];"
       }
     },
     {
-      "id": "a8b3646d-a615-4700-84e2-504bdf274e27",
+      "id": "0d6615a6-220a-430e-b6b9-fb7b34b61191",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -566,14 +607,14 @@
       "main": [
         [
           {
-            "node": "Write manifest + inbox",
+            "node": "Store asset",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Write manifest + inbox": {
+    "Store asset": {
       "main": [
         [
           {
@@ -610,25 +651,25 @@
       "main": [
         [
           {
-            "node": "Write approval + manifest",
+            "node": "Record decision",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Write approval + manifest": {
+    "Record decision": {
       "main": [
         [
           {
-            "node": "Read manifests",
+            "node": "Read assets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read manifests": {
+    "Read assets": {
       "main": [
         [
           {
@@ -654,14 +695,14 @@
       "main": [
         [
           {
-            "node": "Write registry",
+            "node": "Snapshot registry",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Write registry": {
+    "Snapshot registry": {
       "main": [
         [
           {
