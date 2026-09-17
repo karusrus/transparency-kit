@@ -19,8 +19,8 @@ AUDIT_ID = "AiActAuditView00"
 HOST_ID = "RecyclingVoices1"
 # Credential "n8n API" created by hand in the UI (Settings → n8n API → key; Credentials → n8n API). Needs workflow:list.
 # The id is local to this instance; on another instance attach the credential in the editor instead.
-N8N_API_CREDENTIAL_ID = "57qykOiFfUipk1bM"
-N8N_API_CREDENTIAL_NAME = "n8n ruslan"
+N8N_API_CREDENTIAL_ID = "0O4IFf0UeEqYcj74"
+N8N_API_CREDENTIAL_NAME = "n8n account"
 KOKORO_URL = "http://host.docker.internal:8880/tts"
 # Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
 PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
@@ -394,7 +394,7 @@ kit_nodes = [
         "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": "#ai-act-gate"},
         "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
-        "otherOptions": {}}, X(8), 160, onError="continueRegularOutput", notes="The human is told where the gate is. Attach a Slack credential and pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."),
+        "otherOptions": {}}, X(8), 160, onError="continueRegularOutput", disabled=True, notes="Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."),
     (node("Review & approve", "n8n-nodes-base.slack", 2.7, {
         "resource": "message", "operation": "sendAndWait", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": SLACK_CHANNEL},
