@@ -10,4 +10,3 @@ __pycache__/
 secrets/
 # the operator's own photo stays local
 samples/real-person.jpg
-docs/labelled-person.jpg
