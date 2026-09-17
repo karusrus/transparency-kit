@@ -32,18 +32,18 @@ Everything the auditor reads lives in Postgres (`db/schema.sql`): `assets` (one 
 - **Every decision is hash-chained.** A `BEFORE INSERT` trigger computes `hash = sha256(prev_hash | asset | time | reviewer | decision | reason | status | responsible | artefact)`, so the application never chooses its own hash. `verify_chain()` recomputes the whole chain; the audit view runs it on every render and prints *chain verified* or the first broken row.
 - The registry is stored as a snapshot per run: history, not a file that gets overwritten.
 
-Only media files (incoming and labelled) stay on disk under `data/`. The kit keeps one Execute Command node, the ffmpeg label.
+Only media files (incoming and labelled) stay on disk under `data/`.
 
-## The gate: form or Slack
+## The gate: form or a Slack thread
 
 `GATE_MODE` in `workflows/build.py`:
 
 - `form` (default) — a Wait node with a form. Works anywhere; the link is on the audit view and, if a Slack credential is attached, posted to `#ai-act-gate` by **Notify reviewer**. Reviewer identity is whatever the person types.
-- `slack` — Slack **Send and Wait** with the same form in the channel. Only channel members can answer, which is the practical identity control most teams have. Needs a Slack credential on the node; untested here until one is attached.
+- `slack` — the kit posts the asset to a thread in `#ai-act-gate` and then **polls the thread** every 20 s (Slack → channel → replies) until a channel member answers `approve`, `editorial` or `return <reason>`. All traffic is outbound: n8n needs no public address, only a bot token with `chat:write`, `channels:read`, `channels:history`, `users:read`. The reviewer's identity comes from Slack (`users.info`), not from a text field, which answers the auditor's first question. After 24 h without an answer the asset is returned automatically.
 
-## Numbers
+## Labels without a shell
 
-`tools/stats.sh` reads the three numbers an operations lead is asked for straight from the ledger: assets through the gate, share returned, median and p90 decision time, distinct reviewers, decisions in the chain and whether the chain verifies. Run `demo.sh` a few times (`REVIEWER=… DECIDE_DELAY=…`) or, better, real assets with a second reviewer.
+The kit has no Execute Command node. Files go to a small **media-label service** (`tools/media-label`, Python + a static ffmpeg with drawtext, its own container on the same Docker network): images and video get the burnt-in label (full, or a small corner label for artistic work), audio gets the label in its metadata. If the service is unreachable, images fall back to the built-in **Edit Image** node (plain text, works on n8n Cloud), video and audio get *no burnt-in label* and the manifest and audit view say so: the disclosure then goes with the file at publication. Publishing in the demo line is two Read/Write Files nodes.
 
 ## Embedding the kit in a line
 
@@ -94,7 +94,7 @@ Stock n8n is a hardened image without a package manager, so the Dockerfile adds 
 
 ```bash
 docker build -t n8n-ffmpeg .
-./reload.sh        # first time only: starts Postgres + n8n on a Docker network, loads db/schema.sql, imports the DB credential and all workflows, publishes them
+./reload.sh        # first time only: starts Postgres, the media-label service and n8n on a Docker network, loads db/schema.sql, imports the DB credential and all workflows, publishes them
 ../teardown-engine/.venv/bin/python tools/kokoro_server.py --port 8880   # local TTS for the three-voices line (kokoro-onnx)
 ./demo.sh          # seeds four assets and four decisions through the intake form
 open http://localhost:5678/form/notice          # the three-voices line; gates appear on the audit view
@@ -109,7 +109,6 @@ Environment the kit needs (already in `reload.sh`):
 
 | Variable | Why |
 |---|---|
-| `NODES_EXCLUDE=[]` | n8n 2.x disables the Execute Command node by default; the kit uses it for ffmpeg and file writes |
 | `N8N_RESTRICT_FILE_ACCESS_TO=/data` | the Read/Write File node may only touch the mounted media folder |
 | `N8N_RUNNERS_ENABLED=true` | Code nodes run in the task runner |
 
@@ -123,7 +122,8 @@ workflows/transparency-kit.json
 workflows/audit-view.json
 workflows/host-line.json     the three-voices line with the kit as a module
 workflows/sample-line.json   a marketing line without a gate, for the registry to flag
-tools/kokoro_server.py       HTTP wrapper around Kokoro-82M for n8n
+tools/kokoro_server.py       HTTP wrapper around Kokoro-82M for n8n (demo line)
+tools/media-label/           the label service: Dockerfile + server.py
 workflows/audit_render.js    the auditor's page (inlined into the Code node)
 db/schema.sql                assets · decisions (append-only, hash-chained) · registry_snapshots · verify_chain()
 data/                        incoming/  labelled/  published/  (media only; the ledger is in Postgres)
@@ -158,7 +158,7 @@ The kit is built so that each part can be replaced without touching the rest:
 
 - **Gate** — the Wait-form gate can be replaced by Gmail, Slack or Telegram *Send and Wait*; the registry recognises both.
 - **Storage** — the three Postgres nodes can point at any Postgres (managed or on-prem); the schema is one file.
-- **Label** — ffmpeg `drawtext` can be replaced by Bannerbear or the Edit Image node; audio keeps a metadata comment and a spoken or written disclosure at publication.
+- **Label** — the media-label service can be replaced by Bannerbear or any HTTP labeller; Edit Image is the built-in fallback for images.
 - **Intake** — the form can be replaced by a webhook from the generation pipeline; field names stay the same.
 
 ## Not legal advice

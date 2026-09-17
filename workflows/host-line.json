@@ -3,7 +3,7 @@
   "name": "Recycling notice · three voices",
   "nodes": [
     {
-      "id": "aa4526cc-012f-449f-87a6-43f566c4bc2a",
+      "id": "4484fb15-5c47-41d1-ab12-917f79c2d7e2",
       "name": "Notice text",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -34,7 +34,7 @@
       "webhookId": "a1b2c3d4-0201-4000-8000-hostnotice001"
     },
     {
-      "id": "c7a9a122-ec83-40aa-b81b-465d2ad0dd1d",
+      "id": "e61168eb-477e-41e1-be58-fda3d91462f7",
       "name": "Three voices",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -47,7 +47,7 @@
       }
     },
     {
-      "id": "8ebc95f8-67b1-4bb5-95bf-8de065202207",
+      "id": "4beaa2aa-fb23-47fd-aab2-261e9e207c2d",
       "name": "Kokoro TTS (local)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -73,7 +73,7 @@
       }
     },
     {
-      "id": "665df399-41b8-43ac-b45c-4f330c67d743",
+      "id": "ef713f63-1cb5-4f83-b52e-d2e667defd93",
       "name": "Attach fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -86,7 +86,7 @@
       }
     },
     {
-      "id": "69da446b-4d63-4133-8aa9-e3df4a8f5b01",
+      "id": "c88a1706-747e-4701-95d7-360da118562b",
       "name": "One voice at a time",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -100,7 +100,7 @@
       }
     },
     {
-      "id": "82b016b9-bdd6-497f-931b-7537ded39095",
+      "id": "306cdd4f-6daf-4d75-b785-a206cc17c937",
       "name": "AI Act gate",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
@@ -121,7 +121,7 @@
       }
     },
     {
-      "id": "0ec09646-8869-4bd1-af96-a58d1e76e280",
+      "id": "a61f752b-27fc-45aa-9fdc-8d6072ef07ae",
       "name": "Human approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -139,7 +139,7 @@
           },
           "conditions": [
             {
-              "id": "e06e6be9-98b6-463b-9977-300fa8c88b01",
+              "id": "88aa2951-9492-4ad1-a29b-04560660ba17",
               "leftValue": "={{ $json.approved }}",
               "rightValue": "",
               "operator": {
@@ -155,7 +155,7 @@
       }
     },
     {
-      "id": "82f983ed-1a4d-4828-91b8-1bce55c3d385",
+      "id": "c5cbbeda-bf35-4294-96b5-fd31f3afd14e",
       "name": "Prepare publish",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -164,24 +164,44 @@
         100
       ],
       "parameters": {
-        "jsCode": "// One shell command that publishes every approved item (Buffer is not available in expressions, so this lives in Code).\nconst cmds = ['mkdir -p /data/published'];\nconst ids = [];\nfor (const it of $input.all()) {\n  const j = it.json;\n  if (!j.labelled_path) continue;\n  const rec = { id: j.id, published_at: new Date().toISOString(), file: '/data/published/' + String(j.labelled_path).split('/').pop(),\n                disclosure: j.disclosure_sentence, reviewer: j.reviewer, disclosure_status: j.disclosure_status };\n  const b64 = Buffer.from(JSON.stringify(rec, null, 2)).toString('base64');\n  cmds.push(`cp \"${j.labelled_path}\" /data/published/`, `printf %s ${b64} | base64 -d > /data/published/${j.id}.json`);\n  ids.push(j.id);\n}\nreturn [{ json: { published_ids: ids, publish_cmd: cmds.join(' && ') } }];"
+        "jsCode": "// Where the approved file goes. One item per approved asset; the two file nodes after this copy it.\nreturn $input.all().filter(it => it.json.labelled_path).map(it => ({ json: { ...it.json,\n  published_path: '/data/published/' + String(it.json.labelled_path).split('/').pop() } }));"
       }
     },
     {
-      "id": "5e7a21bc-067f-4ec1-be3f-bd365ab80cb7",
-      "name": "Publish to site [exit]",
-      "type": "n8n-nodes-base.executeCommand",
+      "id": "fc85c496-351d-4598-86c3-e413c4f5c807",
+      "name": "Read approved file",
+      "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
         1920,
         100
       ],
       "parameters": {
-        "command": "={{ $json.publish_cmd }}"
+        "operation": "read",
+        "fileSelector": "={{ $json.labelled_path }}",
+        "options": {
+          "dataPropertyName": "data"
+        }
       }
     },
     {
-      "id": "99c2c77d-964c-4a01-96b4-3239c844cdb6",
+      "id": "e126f924-0f3b-4d6b-ac3e-b8b0738a93e2",
+      "name": "Publish to site [exit]",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        100
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Prepare publish').item.json.published_path }}",
+        "dataPropertyName": "data",
+        "options": {}
+      }
+    },
+    {
+      "id": "3f9f67a1-c035-4421-b7fc-630085635ed4",
       "name": "Returned, not published",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -192,7 +212,7 @@
       "parameters": {}
     },
     {
-      "id": "ceef5343-b840-4b2a-b622-c0af30838657",
+      "id": "0e25c306-73d2-4b41-b646-ddae04b40670",
       "name": "What this line is",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -300,6 +320,17 @@
       ]
     },
     "Prepare publish": {
+      "main": [
+        [
+          {
+            "node": "Read approved file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read approved file": {
       "main": [
         [
           {

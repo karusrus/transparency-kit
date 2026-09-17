@@ -3,6 +3,10 @@
 set -e
 cd "$(dirname "$0")"
 python3 workflows/build.py
+docker build -q -t kit-media-label tools/media-label >/dev/null
+docker rm -f kit-media-label >/dev/null 2>&1 || true
+docker network create kit-net >/dev/null 2>&1 || true
+docker run -d --name kit-media-label --network kit-net kit-media-label >/dev/null
 for f in transparency-kit audit-view sample-line sample-50-3 sample-chatbot host-line; do docker exec n8n n8n import:workflow --input=/workflows/$f.json | tail -1; done
 for id in AiActTransparenc AiActAuditView00 RecyclingVoices1; do docker exec n8n n8n publish:workflow --id=$id >/dev/null; done
 docker restart n8n >/dev/null

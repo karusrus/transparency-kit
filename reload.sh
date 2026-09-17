@@ -15,6 +15,10 @@ docker run -d --name kit-db --network kit-net \
   -v kit_db:/var/lib/postgresql/data -v "$PWD/db/schema.sql":/docker-entrypoint-initdb.d/01-schema.sql:ro \
   postgres:16-alpine >/dev/null
 until docker exec kit-db pg_isready -U kit -d kit >/dev/null 2>&1; do sleep 1; done
+docker build -q -t kit-media-label tools/media-label >/dev/null
+docker rm -f kit-media-label >/dev/null 2>&1 || true
+docker network create kit-net >/dev/null 2>&1 || true
+docker run -d --name kit-media-label --network kit-net kit-media-label >/dev/null
 docker run -d --name n8n --network kit-net -p 5678:5678 --add-host host.docker.internal:host-gateway \
   -v n8n_data:/home/node/.n8n -v "$PWD/data":/data -v "$PWD/workflows":/workflows:ro -v "$PWD/secrets":/secrets:ro \
   -e N8N_SECURE_COOKIE=false -e GENERIC_TIMEZONE=Europe/Sofia -e TZ=Europe/Sofia \

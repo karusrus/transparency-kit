@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "15fe5081-dbb3-48fa-a604-a400adc6ee5c",
+      "id": "601c585f-bd35-48cd-8bcf-75fa50843d0c",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -163,7 +163,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "7a8f6eb8-026a-495d-b763-5d8e783eedb6",
+      "id": "0951535e-1fcc-4186-b14d-1eb386cb0975",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -176,7 +176,7 @@
       }
     },
     {
-      "id": "ff9b9ee6-1f88-4e94-b15c-e94ef732677f",
+      "id": "6de1ffc2-2a6e-4a71-bfdf-9247d2aa46a1",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -192,7 +192,7 @@
       }
     },
     {
-      "id": "05ad0adb-dc97-4c03-a4e2-ea170f7d09ca",
+      "id": "2a799eb8-6011-436b-b4ce-0189dc659833",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -201,11 +201,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst shows = String(g('What does it show?', 'shows') || (yes(g('Depicts a real person (face or voice)?', 'depicts_real_person')) ? 'a real person (face or voice)' : 'nothing real')).toLowerCase();\nconst realPerson = /person|face|voice/.test(shows);\nconst realThing = /object|place|event|entity/.test(shows);\nconst manipulated = /manipulat/.test(String(g('Generated or manipulated?', 'origin') || 'generated').toLowerCase());\nconst artistic = yes(g('Artistic, creative or satirical work?', 'artistic'));\nconst publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };\nconst rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';\nconst ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');\nconst shellSafe = (v) => String(v ?? '').replace(/[^\\p{L}\\p{N} .,;:()\\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => manipulated ? `This ${type} was altered with an AI system (${m}).` : `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [], other_law = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson || realThing) {\n    // Art. 3(60): content resembling existing persons, objects, places, entities or events that would falsely appear authentic\n    category = 'deepfake'; label_required = true; label_basis = artistic ? 'law (limited: artistic work)' : 'law';\n    obligations.push('Art. 3(60) deep fake: ' + (manipulated ? 'manipulated' : 'generated') + ' content resembling ' + (realPerson ? 'a real person' : 'a real object, place or event') + ' that would appear authentic.');\n    obligations.push('Art. 50(4) §1 — disclose that the content is artificially ' + (manipulated ? 'manipulated' : 'generated') + '.' + (artistic ? ' Artistic, creative or satirical work: the disclosure may be limited so it does not hamper the work — still present, in an appropriate form.' : ''));\n    if (realPerson) other_law.push('Consent or another legal basis for using the person\\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: drawtext in this ffmpeg build drops the last glyph after a multibyte character\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst font = '/usr/share/fonts/DejaVuSans.ttf';\nconst draw = artistic\n  ? `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white@0.85:fontsize=h/48:box=1:boxcolor=black@0.35:boxborderw=6:x=w-tw-14:y=h-th-14`\n  : `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;\nconst meta = `-metadata comment=\"${label_text}; manifest ${id}\" -metadata title=\"${shellSafe(disclosure_sentence)}\"`;\nlet ffmpeg_cmd = '';\nif (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" ${meta} \"${outPath}\"`;\nelse if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" -c:a copy ${meta} \"${outPath}\"`;\nelse if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -c copy ${meta} \"${outPath}\"`;\n\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations, other_law,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];"
+        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst shows = String(g('What does it show?', 'shows') || (yes(g('Depicts a real person (face or voice)?', 'depicts_real_person')) ? 'a real person (face or voice)' : 'nothing real')).toLowerCase();\nconst realPerson = /person|face|voice/.test(shows);\nconst realThing = /object|place|event|entity/.test(shows);\nconst manipulated = /manipulat/.test(String(g('Generated or manipulated?', 'origin') || 'generated').toLowerCase());\nconst artistic = yes(g('Artistic, creative or satirical work?', 'artistic'));\nconst publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };\nconst rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';\nconst ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');\nconst shellSafe = (v) => String(v ?? '').replace(/[^\\p{L}\\p{N} .,;:()\\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => manipulated ? `This ${type} was altered with an AI system (${m}).` : `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [], other_law = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson || realThing) {\n    // Art. 3(60): content resembling existing persons, objects, places, entities or events that would falsely appear authentic\n    category = 'deepfake'; label_required = true; label_basis = artistic ? 'law (limited: artistic work)' : 'law';\n    obligations.push('Art. 3(60) deep fake: ' + (manipulated ? 'manipulated' : 'generated') + ' content resembling ' + (realPerson ? 'a real person' : 'a real object, place or event') + ' that would appear authentic.');\n    obligations.push('Art. 50(4) §1 — disclose that the content is artificially ' + (manipulated ? 'manipulated' : 'generated') + '.' + (artistic ? ' Artistic, creative or satirical work: the disclosure may be limited so it does not hamper the work — still present, in an appropriate form.' : ''));\n    if (realPerson) other_law.push('Consent or another legal basis for using the person\\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: some ffmpeg builds drop the last glyph after a multibyte character\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst wants_burn_in = (type === 'image' || type === 'video') && label_required;\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations, other_law,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: file ? outPath : null, label_small: artistic, wants_burn_in,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, binary_key }, binary: it.binary }];"
       }
     },
     {
-      "id": "684eccb6-1ebf-43a0-8526-f099c16054ab",
+      "id": "3ee9ded1-ebe1-40c5-baa2-a733aec3ed17",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -223,7 +223,7 @@
           },
           "conditions": [
             {
-              "id": "74869692-4a2c-4854-9403-cea31da63f66",
+              "id": "ff2f9d47-4ccb-447f-9e94-3c4a107418b1",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -238,7 +238,7 @@
       }
     },
     {
-      "id": "78d3bbfc-7442-4dca-a5e8-404a8d38c3de",
+      "id": "5f7928aa-38d5-419f-b716-ec41db6c6bd1",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -251,7 +251,7 @@
       }
     },
     {
-      "id": "eb652366-820e-4d1e-85d7-78b7d2cbf9df",
+      "id": "25cb1331-3626-40f7-83f0-636c71413274",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -267,38 +267,175 @@
       }
     },
     {
-      "id": "1e96fbf2-b3ef-4ab3-a4a0-5488ca678d51",
-      "name": "Label with ffmpeg",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "id": "bd56b6fb-c3cd-463a-b158-323ead93fb69",
+      "name": "Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        620
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e2b865c3-a08f-4d88-a408-c072f3cf8cf5",
+              "leftValue": "={{ $('Classify (Art. 50)').first().json.asset_type }}",
+              "rightValue": "image",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2b5a17f9-92d6-4fce-b5fd-56c3a8cf6865",
+      "name": "Label image (Edit Image)",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        620
+      ],
+      "parameters": {
+        "operation": "text",
+        "dataPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}",
+        "text": "={{ $('Classify (Art. 50)').first().json.label_text }}",
+        "fontSize": "={{ $('Classify (Art. 50)').first().json.label_small ? 24 : 44 }}",
+        "fontColor": "#ffffff",
+        "positionX": 24,
+        "positionY": 60,
+        "lineLength": 300,
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "9068d8b3-8cd8-44eb-aee9-998171366232",
+      "name": "Label media (service)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1200,
         440
       ],
       "parameters": {
-        "command": "={{ $('Classify (Art. 50)').first().json.ffmpeg_cmd || 'true' }}"
+        "method": "POST",
+        "url": "={{ 'http://kit-media-label:8881/label?type=' + $('Classify (Art. 50)').first().json.asset_type + '&ext=' + encodeURIComponent($('Classify (Art. 50)').first().json.ext) + '&small=' + ($('Classify (Art. 50)').first().json.label_small ? 1 : 0) + '&text=' + encodeURIComponent($('Classify (Art. 50)').first().json.label_text) + '&comment=' + encodeURIComponent($('Classify (Art. 50)').first().json.label_text + '; manifest ' + $('Classify (Art. 50)').first().json.id) }}",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "2a7c149a-f7f8-4cd3-8f7c-35823e1f012b",
+      "name": "Write labelled file",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        440
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $('Classify (Art. 50)').first().json.labelled_path }}",
+        "dataPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}",
+        "options": {}
       }
     },
     {
-      "id": "99c9d237-2c7a-4236-ae55-28c7f4d96f23",
+      "id": "a1337aeb-35dc-45b4-a6c3-35427cc63ab6",
+      "name": "Burned in",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        440
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "00157284-cb39-4553-a3ba-dddf82f0c0d3",
+              "name": "burned_in",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "372b6c7b-f5bb-48b0-bbf4-4a47d98e061f",
+      "name": "No burn-in",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        760
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0c473e22-f1d6-4640-be4d-096a6048610e",
+              "name": "burned_in",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "9ef3967c-2684-4da6-a778-9efb252194a2",
+              "name": "label_note",
+              "value": "={{ 'No burnt-in label: ' + ($('Classify (Art. 50)').first().json.asset_type === 'audio' ? 'audio carries the disclosure in metadata and at publication' : 'the media-label service was not reachable; disclosure goes with the file at publication') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2ca0cd13-18da-46d5-9f91-d39ca032ce42",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1440,
+        2160,
         300
       ],
       "parameters": {
-        "jsCode": "// Collect everything into the manifest and add the gate link. The next node stores it in Postgres.\nconst m = { ...$('Classify (Art. 50)').first().json };\ndelete m.ext; delete m.ffmpeg_cmd; delete m.binary_key;\nconst src = $input.first().json;\nif (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;\nif (src.exitCode !== undefined) { m.label_exit_code = src.exitCode; if (src.stderr) m.label_stderr = String(src.stderr).slice(0, 500); }\nm.gate_url = $execution.resumeFormUrl;\nm.execution_id = $execution.id;\nreturn [{ json: m }];"
+        "jsCode": "// Collect everything into the manifest and add the gate link. The next node stores it in Postgres.\nconst m = { ...$('Classify (Art. 50)').first().json };\ndelete m.ext; delete m.binary_key;\nconst src = $input.first().json;\nif (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;\nif (src.label_note !== undefined) { m.label_note = src.label_note; }\nif (src.burned_in !== undefined) { m.burned_in = src.burned_in; if (!src.burned_in) { m.labelled_path = m.incoming_path; } }\nm.gate_url = $execution.resumeFormUrl;\nm.execution_id = $execution.id;\nreturn [{ json: m }];"
       }
     },
     {
-      "id": "f3e09ea6-8a04-4c72-abed-db139e25955f",
+      "id": "c3860073-fac6-46b7-baee-60fcda6817b8",
       "name": "Store asset",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1680,
+        2400,
         300
       ],
       "parameters": {
@@ -316,12 +453,12 @@
       }
     },
     {
-      "id": "43cc8c51-8bc6-4b42-a210-c8d5846983c5",
+      "id": "68f12820-75db-4f7f-89a4-610f47902e3c",
       "name": "Notify reviewer (Slack)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
-        1920,
+        2640,
         160
       ],
       "parameters": {
@@ -341,12 +478,12 @@
       "notes": "Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
     },
     {
-      "id": "8f1fc6f7-e9c2-40f2-be4c-2b93c555930b",
+      "id": "37ea5002-18ba-4bd0-af9d-ebdb74eea6a2",
       "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        2160,
+        2880,
         300
       ],
       "parameters": {
@@ -359,7 +496,7 @@
               "fieldLabel": "Context",
               "fieldType": "html",
               "elementName": "context",
-              "html": "={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">' + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>' + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>' + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>' + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '') + '<p style=\"margin:0 0 8px\">Shows: ' + esc(m.shows) + ' · ' + (m.manipulated ? 'manipulated' : 'generated') + (m.artistic ? ' · artistic/satirical work' : '') + '</p>' + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '') + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '') + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '') + '</div>'; })() }}"
+              "html": "={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">' + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>' + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>' + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>' + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '') + '<p style=\"margin:0 0 8px\">Shows: ' + esc(m.shows) + ' · ' + (m.manipulated ? 'manipulated' : 'generated') + (m.artistic ? ' · artistic/satirical work' : '') + '</p>' + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '') + (m.labelled_path ? '<p style=\"margin:0 0 8px\">File: <code>' + esc(m.labelled_path) + '</code> · ' + (m.burned_in ? 'label burnt in' : esc(m.label_note || 'no burnt-in label')) + '</p>' : '') + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '') + '</div>'; })() }}"
             },
             {
               "fieldLabel": "Decision",
@@ -394,12 +531,12 @@
       "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "eaf94d2b-c82d-4fb4-930f-e852a125542c",
+      "id": "de831aa3-c72b-4bcb-a640-21c47236fdec",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2400,
+        3120,
         300
       ],
       "parameters": {
@@ -407,12 +544,12 @@
       }
     },
     {
-      "id": "86328bec-0080-4d0b-8940-20674476e142",
+      "id": "2195ac63-8268-482c-8aaa-e216116543e8",
       "name": "Record decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2640,
+        3360,
         300
       ],
       "parameters": {
@@ -430,12 +567,12 @@
       }
     },
     {
-      "id": "91696db8-5534-40d3-90e8-1df9b3777a2f",
+      "id": "01331807-4a89-4f23-8d0d-664fe87885d0",
       "name": "Read assets",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2880,
+        3600,
         300
       ],
       "parameters": {
@@ -453,12 +590,12 @@
       }
     },
     {
-      "id": "f14ac7ea-7dea-4edf-b1ab-50675f827c7b",
+      "id": "eb980677-018c-4799-a234-58f31272e58c",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
       "position": [
-        3120,
+        3840,
         300
       ],
       "parameters": {
@@ -477,12 +614,12 @@
       }
     },
     {
-      "id": "93cfeb40-bcd7-4240-a5e2-75ae4791abfd",
+      "id": "00810e10-3878-4516-bc82-293cacbc1b6f",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3360,
+        4080,
         300
       ],
       "parameters": {
@@ -490,12 +627,12 @@
       }
     },
     {
-      "id": "e2cbaa7e-e6b0-444e-bead-be9575c3016f",
+      "id": "d98ff4f6-5137-400d-a020-747bc38210f5",
       "name": "Snapshot registry",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3600,
+        4320,
         300
       ],
       "parameters": {
@@ -513,12 +650,12 @@
       }
     },
     {
-      "id": "cf0618af-6363-4b47-9f44-50d1b6a6a97e",
+      "id": "de1dcfec-2119-4ff8-b8a6-6abf4e09d49d",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3840,
+        4560,
         300
       ],
       "parameters": {
@@ -526,18 +663,18 @@
       }
     },
     {
-      "id": "e49321ad-4af6-463b-8c06-563e0957b345",
+      "id": "6e609796-53e2-4bb9-ae93-c2463bf786ea",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        240,
+        960,
         0
       ],
       "parameters": {
-        "width": 1950,
+        "width": 2700,
         "height": 130,
-        "content": "## AI Act Transparency Kit — deployer side of Article 50, as a module\nTwo entries: its own intake form, or **Execute Sub-workflow** from any production line (pass asset_type, language, model, prompt, operator, depicts_real_person, public_information, caller_workflow and the file as binary `data`). classify → label + manifest → **Wait-form human gate** (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."
+        "content": "## AI Act Transparency Kit — deployer side of Article 50, as a module\nTwo entries: its own intake form, or **Execute Sub-workflow** from any production line (pass asset_type, language, model, prompt, operator, depicts_real_person, public_information, caller_workflow and the file as binary `data`). classify → label (Edit Image for images, an optional ffmpeg service for video, metadata for audio; no shell) + manifest → **human gate** (form, or a Slack thread the kit polls) (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."
       }
     }
   ],
@@ -619,14 +756,90 @@
       "main": [
         [
           {
-            "node": "Label with ffmpeg",
+            "node": "Label media (service)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Label with ffmpeg": {
+    "Label media (service)": {
+      "main": [
+        [
+          {
+            "node": "Write labelled file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image?": {
+      "main": [
+        [
+          {
+            "node": "Label image (Edit Image)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No burn-in",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label image (Edit Image)": {
+      "main": [
+        [
+          {
+            "node": "Write labelled file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No burn-in",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write labelled file": {
+      "main": [
+        [
+          {
+            "node": "Burned in",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Burned in": {
+      "main": [
+        [
+          {
+            "node": "Build manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No burn-in": {
       "main": [
         [
           {

@@ -22,10 +22,13 @@ HOST_ID = "RecyclingVoices1"
 N8N_API_CREDENTIAL_ID = "0O4IFf0UeEqYcj74"
 N8N_API_CREDENTIAL_NAME = "n8n account"
 KOKORO_URL = "http://host.docker.internal:8880/tts"
+MEDIA_LABEL_URL = "http://kit-media-label:8881/label"   # ffmpeg label service in its own container; if unreachable, images fall back to Edit Image, media to "disclosure at publication"
 # Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
 PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
 GATE_MODE = "form"          # "form": Wait node with a form (works everywhere) · "slack": Slack Send-and-Wait with the same form, channel members only
 SLACK_CHANNEL = "#ai-act-gate"
+SLACK_POLL_SECONDS = 20
+SLACK_MAX_POLLS = 4320          # 24 h at 20 s
 
 
 def pg(name, query, values_expr, x, y, **extra):
@@ -125,19 +128,10 @@ if (type === 'text') {
   }
 }
 
-const label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: drawtext in this ffmpeg build drops the last glyph after a multibyte character
+const label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: some ffmpeg builds drop the last glyph after a multibyte character
 const inPath  = `/data/incoming/${id}${ext}`;
 const outPath = `/data/labelled/${id}${ext}`;
-const font = '/usr/share/fonts/DejaVuSans.ttf';
-const draw = artistic
-  ? `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white@0.85:fontsize=h/48:box=1:boxcolor=black@0.35:boxborderw=6:x=w-tw-14:y=h-th-14`
-  : `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;
-const meta = `-metadata comment="${label_text}; manifest ${id}" -metadata title="${shellSafe(disclosure_sentence)}"`;
-let ffmpeg_cmd = '';
-if (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -vf "${draw}" ${meta} "${outPath}"`;
-else if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -vf "${draw}" -c:a copy ${meta} "${outPath}"`;
-else if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -c copy ${meta} "${outPath}"`;
-
+const wants_burn_in = (type === 'image' || type === 'video') && label_required;
 const manifest = {
   id, created_at: now.toISOString(),
   line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),
@@ -149,12 +143,12 @@ const manifest = {
   depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),
   public_information: publicInfo,
   source_file: file ? file.fileName : null,
-  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,
+  incoming_path: file ? inPath : null, labelled_path: file ? outPath : null, label_small: artistic, wants_burn_in,
   text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,
   language: lang, disclosure_sentence,
   status: 'pending_review',
 };
-return [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];
+return [{ json: { ...manifest, ext, binary_key }, binary: it.binary }];
 """
 
 TEXT_JS = r"""
@@ -167,10 +161,11 @@ return [{ json: { ...m, disclosed_text: m.label_required ? m.text_content + foot
 MANIFEST_JS = r"""
 // Collect everything into the manifest and add the gate link. The next node stores it in Postgres.
 const m = { ...$('Classify (Art. 50)').first().json };
-delete m.ext; delete m.ffmpeg_cmd; delete m.binary_key;
+delete m.ext; delete m.binary_key;
 const src = $input.first().json;
 if (src.disclosed_text !== undefined) m.disclosed_text = src.disclosed_text;
-if (src.exitCode !== undefined) { m.label_exit_code = src.exitCode; if (src.stderr) m.label_stderr = String(src.stderr).slice(0, 500); }
+if (src.label_note !== undefined) { m.label_note = src.label_note; }
+if (src.burned_in !== undefined) { m.burned_in = src.burned_in; if (!src.burned_in) { m.labelled_path = m.incoming_path; } }
 m.gate_url = $execution.resumeFormUrl;
 m.execution_id = $execution.id;
 return [{ json: m }];
@@ -348,6 +343,32 @@ const registry = { generated_at: new Date().toISOString(), instance_workflows: w
 return [{ json: { systems: rows.length, workflows: wfs.length, partial: wfs.length === 0, registry } }];
 """.replace('__KIT_ID__', KIT_ID)
 
+SLACK_PARSE_JS = r"""
+// Look through the thread replies for the first decision by a channel member. Returns decided=false to keep polling.
+const root = $('Post to the review thread').first().json;
+const replies = $input.all().map(i => i.json).filter(m => m.ts !== root.ts && !m.bot_id && m.user);
+let decided = false, decision = '', reason = '', user = '', ts = '';
+for (const m of replies) {
+  const t = String(m.text || '').trim(); const low = t.toLowerCase();
+  if (/^(:white_check_mark:|✅|approve)/.test(low)) { decided = true; decision = 'Approve — publish with the disclosure'; }
+  else if (/^(:writing_hand:|✍️|editorial)/.test(low)) { decided = true; decision = 'Editorial exception — I edited this text and take editorial responsibility (text only)'; }
+  else if (/^(:x:|❌|return|reject)/.test(low)) { decided = true; decision = 'Return — needs changes'; }
+  if (decided) { reason = t.replace(/^(:[a-z_]+:|✅|✍️|❌|approve|editorial|return|reject)\s*[:\-–—]?\s*/i, '').trim(); user = m.user; ts = m.ts; break; }
+}
+const polls = $runIndex + 1;
+if (!decided && polls >= __MAX__) { decided = true; decision = 'Return — needs changes'; reason = 'No decision in the thread within the wait limit; returned automatically.'; user = ''; }
+return [{ json: { decided, Decision: decision, 'Reason / note': reason, slack_user: user, slack_ts: ts, polls } }];
+""".replace('__MAX__', str(SLACK_MAX_POLLS))
+
+SLACK_RESOLVE_JS = r"""
+// The reviewer's identity comes from Slack, not from a text field.
+const d = $('Decided in the thread?').first().json;
+const u = $input.first().json || {};
+const name = (u.real_name || (u.profile && u.profile.real_name) || u.name || '').trim();
+const reviewer = name ? `${name} (Slack ${d.slack_user})` : (d.slack_user ? `Slack ${d.slack_user}` : 'gate timeout');
+return [{ json: { Decision: d.Decision, Reviewer: reviewer, 'Reason / note': d['Reason / note'], slack_user: d.slack_user, slack_ts: d.slack_ts } }];
+"""
+
 RETURN_JS = r"""
 // What a calling workflow gets back, one item per asset.
 const m = $('Resolve decision').first().json;
@@ -367,7 +388,7 @@ GATE_HTML = ("={{ (() => { const m = $('Build manifest').first().json; const esc
              " + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')"
              " + '<p style=\"margin:0 0 8px\">Shows: ' + esc(m.shows) + ' · ' + (m.manipulated ? 'manipulated' : 'generated') + (m.artistic ? ' · artistic/satirical work' : '') + '</p>'"
              " + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '')"
-             " + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '')"
+             " + (m.labelled_path ? '<p style=\"margin:0 0 8px\">File: <code>' + esc(m.labelled_path) + '</code> · ' + (m.burned_in ? 'label burnt in' : esc(m.label_note || 'no burnt-in label')) + '</p>' : '')"
              " + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '')"
              " + '</div>'; })() }}")
 
@@ -410,49 +431,85 @@ kit_nodes = [
     node("Text disclosure", "n8n-nodes-base.code", 2, {"jsCode": TEXT_JS.strip()}, X(4), 160),
     node("Save incoming file", "n8n-nodes-base.readWriteFile", 1, {
         "operation": "write", "fileName": "={{ $json.incoming_path }}", "dataPropertyName": "={{ $json.binary_key || 'File' }}", "options": {}}, X(4), 440),
-    node("Label with ffmpeg", "n8n-nodes-base.executeCommand", 1, {
-        "command": "={{ $('Classify (Art. 50)').first().json.ffmpeg_cmd || 'true' }}"}, X(5), 440),
-    node("Build manifest", "n8n-nodes-base.code", 2, {"jsCode": MANIFEST_JS.strip()}, X(6), 300),
+    node("Image?", "n8n-nodes-base.if", 2.2, {"conditions": cond("={{ $('Classify (Art. 50)').first().json.asset_type }}", "image"), "options": {}}, X(6), 620),
+    node("Label image (Edit Image)", "n8n-nodes-base.editImage", 1.1, {
+        "operation": "text", "dataPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}",
+        "text": "={{ $('Classify (Art. 50)').first().json.label_text }}",
+        "fontSize": "={{ $('Classify (Art. 50)').first().json.label_small ? 24 : 44 }}", "fontColor": "#ffffff",
+        "positionX": 24, "positionY": 60, "lineLength": 300,
+        "options": {}}, X(7), 620, onError="continueErrorOutput"),
+    node("Label media (service)", "n8n-nodes-base.httpRequest", 4.2, {
+        "method": "POST", "url": "={{ '" + MEDIA_LABEL_URL + "?type=' + $('Classify (Art. 50)').first().json.asset_type + '&ext=' + encodeURIComponent($('Classify (Art. 50)').first().json.ext) + '&small=' + ($('Classify (Art. 50)').first().json.label_small ? 1 : 0) + '&text=' + encodeURIComponent($('Classify (Art. 50)').first().json.label_text) + '&comment=' + encodeURIComponent($('Classify (Art. 50)').first().json.label_text + '; manifest ' + $('Classify (Art. 50)').first().json.id) }}",
+        "sendBody": True, "contentType": "binaryData", "inputDataFieldName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}",
+        "options": {"response": {"response": {"responseFormat": "file", "outputPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}"}}, "timeout": 300000}},
+        X(5), 440, onError="continueErrorOutput"),
+    node("Write labelled file", "n8n-nodes-base.readWriteFile", 1, {
+        "operation": "write", "fileName": "={{ $('Classify (Art. 50)').first().json.labelled_path }}", "dataPropertyName": "={{ $('Classify (Art. 50)').first().json.binary_key || 'File' }}", "options": {}}, X(7), 440),
+    node("Burned in", "n8n-nodes-base.set", 3.4, {"assignments": {"assignments": [{"id": nid(), "name": "burned_in", "value": True, "type": "boolean"}]}, "options": {}}, X(8), 440),
+    node("No burn-in", "n8n-nodes-base.set", 3.4, {"assignments": {"assignments": [
+        {"id": nid(), "name": "burned_in", "value": False, "type": "boolean"},
+        {"id": nid(), "name": "label_note", "value": "={{ 'No burnt-in label: ' + ($('Classify (Art. 50)').first().json.asset_type === 'audio' ? 'audio carries the disclosure in metadata and at publication' : 'the media-label service was not reachable; disclosure goes with the file at publication') }}", "type": "string"}]}, "options": {}}, X(8), 760),
+    node("Build manifest", "n8n-nodes-base.code", 2, {"jsCode": MANIFEST_JS.strip()}, X(9), 300),
     pg("Store asset", "insert into assets (id, line, asset_type, category, status, model, operator, language, gate_url, execution_id, manifest) values ($1,$2,$3,$4,'pending_review',$5,$6,$7,$8,$9,$10::jsonb) on conflict (id) do update set manifest = excluded.manifest, gate_url = excluded.gate_url, execution_id = excluded.execution_id",
-       "={{ [ $json.id, $json.line, $json.asset_type, $json.category, $json.model, $json.operator, $json.language, $json.gate_url, $json.execution_id, JSON.stringify($json) ] }}", X(7), 300),
-    node("Notify reviewer (Slack)", "n8n-nodes-base.slack", 2.3, {
+       "={{ [ $json.id, $json.line, $json.asset_type, $json.category, $json.model, $json.operator, $json.language, $json.gate_url, $json.execution_id, JSON.stringify($json) ] }}", X(10), 300),
+    *([] if GATE_MODE == "slack" else [node("Notify reviewer (Slack)", "n8n-nodes-base.slack", 2.3, {
         "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": "#ai-act-gate"},
         "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
-        "otherOptions": {}}, X(8), 160, onError="continueRegularOutput", disabled=True, notes="Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."),
-    (node("Review & approve", "n8n-nodes-base.slack", 2.7, {
-        "resource": "message", "operation": "sendAndWait", "select": "channel",
+        "otherOptions": {}}, X(11), 160, onError="continueRegularOutput", disabled=True, notes="Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view.")]),
+    *([
+      node("Post to the review thread", "n8n-nodes-base.slack", 2.7, {
+        "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": SLACK_CHANNEL},
-        "message": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence }}",
-        "responseType": "customForm", "defineForm": "fields", "formFields": GATE_FIELDS, "options": {}},
-        X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001") if GATE_MODE == "slack" else
-    node("Review & approve", "n8n-nodes-base.wait", 1.1, {
+        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nFile: ' + ($('Build manifest').first().json.labelled_path || 'text') + '\\nReply in this thread: *approve* · *editorial* (text only, you take editorial responsibility) · *return <reason>*' }}",
+        "otherOptions": {}}, X(9), 300),
+      node("Wait for the thread", "n8n-nodes-base.wait", 1.1, {"resume": "timeInterval", "amount": SLACK_POLL_SECONDS, "unit": "seconds"}, X(10), 300, webhookId="a1b2c3d4-0005-4000-8000-aiactpoll0001"),
+      node("Read the thread", "n8n-nodes-base.slack", 2.7, {
+        "resource": "channel", "operation": "replies", "channelId": {"__rl": True, "mode": "id", "value": "={{ $('Post to the review thread').first().json.channel }}"},
+        "ts": "={{ $('Post to the review thread').first().json.ts }}", "returnAll": True, "filters": {}}, X(11), 300),
+      node("Decided in the thread?", "n8n-nodes-base.code", 2, {"jsCode": SLACK_PARSE_JS.strip()}, X(12), 300),
+      node("Decision found?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
+        "conditions": [{"id": nid(), "leftValue": "={{ $json.decided }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": True}}], "combinator": "and"}, "options": {}}, X(13), 300),
+      node("Who answered", "n8n-nodes-base.slack", 2.7, {"resource": "user", "operation": "info", "user": {"__rl": True, "mode": "id", "value": "={{ $json.slack_user }}"}}, X(14), 300, onError="continueRegularOutput"),
+      node("Review & approve", "n8n-nodes-base.code", 2, {"jsCode": SLACK_RESOLVE_JS.strip()}, X(15), 300),
+    ] if GATE_MODE == "slack" else [
+      node("Review & approve", "n8n-nodes-base.wait", 1.1, {
         "resume": "form", "formTitle": "Human approval gate",
         "formDescription": "One asset, one decision. Everything below was filled by the line.",
-        "formFields": GATE_FIELDS, "options": {}}, X(9), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001")),
-    node("Resolve decision", "n8n-nodes-base.code", 2, {"jsCode": RESOLVE_JS.strip()}, X(10), 300),
+        "formFields": GATE_FIELDS, "options": {}}, X(12), 300, webhookId="a1b2c3d4-0002-4000-8000-aiactgate0001")
+    ]),
+    node("Resolve decision", "n8n-nodes-base.code", 2, {"jsCode": RESOLVE_JS.strip()}, X(13), 300),
     pg("Record decision", "with d as (insert into decisions (asset_id, reviewer, decision, reason, note, disclosure_status, responsible_person, artefact, execution_id, workflow_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning seq, hash) update assets a set status = $11, disclosure_status = $6, decided_at = now(), manifest = $12::jsonb from d where a.id = $1 returning d.seq, d.hash",
-       "={{ [ $json.id, $json.reviewer, $json.approval.decision, $json.approval.reason, $json.approval.note, $json.disclosure_status, $json.responsible_person, $json.approval.artefact, $json.approval.execution_id, $json.approval.workflow_id, $json.status, JSON.stringify(Object.fromEntries(Object.entries($json).filter(([k]) => k !== 'approval'))) ] }}", X(11), 300),
-    pg("Read assets", "select id, status, disclosure_status, manifest from assets order by created_at", "={{ [] }}", X(12), 300),
+       "={{ [ $json.id, $json.reviewer, $json.approval.decision, $json.approval.reason, $json.approval.note, $json.disclosure_status, $json.responsible_person, $json.approval.artefact, $json.approval.execution_id, $json.approval.workflow_id, $json.status, JSON.stringify(Object.fromEntries(Object.entries($json).filter(([k]) => k !== 'approval'))) ] }}", X(14), 300),
+    pg("Read assets", "select id, status, disclosure_status, manifest from assets order by created_at", "={{ [] }}", X(15), 300),
     node("Read all workflows", "n8n-nodes-base.n8n", 1, {"resource": "workflow", "operation": "getAll", "returnAll": True, "filters": {}},
-         X(13), 300, onError="continueRegularOutput", executeOnce=True, credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
-    node("Registry rows", "n8n-nodes-base.code", 2, {"jsCode": REGISTRY_JS.strip()}, X(14), 300),
+         X(16), 300, onError="continueRegularOutput", executeOnce=True, credentials={"n8nApi": {"id": N8N_API_CREDENTIAL_ID, "name": N8N_API_CREDENTIAL_NAME}}),
+    node("Registry rows", "n8n-nodes-base.code", 2, {"jsCode": REGISTRY_JS.strip()}, X(17), 300),
     pg("Snapshot registry", "insert into registry_snapshots (partial, systems, registry) values ($1, $2, $3::jsonb)",
-       "={{ [ $json.partial, $json.systems, JSON.stringify($json.registry) ] }}", X(15), 300),
-    node("Return to caller", "n8n-nodes-base.code", 2, {"jsCode": RETURN_JS.strip()}, X(16), 300),
-    node("How it works", "n8n-nodes-base.stickyNote", 1, {"width": 1950, "height": 130, "content":
+       "={{ [ $json.partial, $json.systems, JSON.stringify($json.registry) ] }}", X(18), 300),
+    node("Return to caller", "n8n-nodes-base.code", 2, {"jsCode": RETURN_JS.strip()}, X(19), 300),
+    node("How it works", "n8n-nodes-base.stickyNote", 1, {"width": 2700, "height": 130, "content":
         "## AI Act Transparency Kit — deployer side of Article 50, as a module\n"
         "Two entries: its own intake form, or **Execute Sub-workflow** from any production line (pass asset_type, language, model, prompt, operator, depicts_real_person, public_information, caller_workflow and the file as binary `data`). "
-        "classify → label + manifest → **Wait-form human gate** (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. "
-        "Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."}, X(1), 0),
+        "classify → label (Edit Image for images, an optional ffmpeg service for video, metadata for audio; no shell) + manifest → **human gate** (form, or a Slack thread the kit polls) (link on the audit view) → approval log → registry of every AI system on this instance with **path analysis**: generator → publishing node, what stands in between. "
+        "Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller."}, X(4), 0),
 ]
 kit_conn = wire(
     ("Asset produced", "Prompt hash"), ("Called by another workflow", "Prompt hash"),
     ("Prompt hash", "Classify (Art. 50)"), ("Classify (Art. 50)", "Is text?"),
     ("Is text?", "Text disclosure", 0), ("Is text?", "Save incoming file", 1),
-    ("Text disclosure", "Build manifest"), ("Save incoming file", "Label with ffmpeg"), ("Label with ffmpeg", "Build manifest"),
-    ("Build manifest", "Store asset"), ("Store asset", "Notify reviewer (Slack)"), ("Notify reviewer (Slack)", "Review & approve"),
-    ("Review & approve", "Resolve decision"), ("Resolve decision", "Record decision"),
+    ("Text disclosure", "Build manifest"), ("Save incoming file", "Label media (service)"),
+    ("Label media (service)", "Write labelled file", 0), ("Label media (service)", "Image?", 1),
+    ("Image?", "Label image (Edit Image)", 0), ("Image?", "No burn-in", 1),
+    ("Label image (Edit Image)", "Write labelled file", 0), ("Label image (Edit Image)", "No burn-in", 1),
+    ("Write labelled file", "Burned in"), ("Burned in", "Build manifest"), ("No burn-in", "Build manifest"),
+    *(( ("Build manifest", "Store asset"), ("Store asset", "Post to the review thread"), ("Post to the review thread", "Wait for the thread"),
+        ("Wait for the thread", "Read the thread"), ("Read the thread", "Decided in the thread?"), ("Decided in the thread?", "Decision found?"),
+        ("Decision found?", "Who answered", 0), ("Decision found?", "Wait for the thread", 1), ("Who answered", "Review & approve"),
+        ("Review & approve", "Resolve decision") ) if GATE_MODE == "slack" else
+      ( ("Build manifest", "Store asset"), ("Store asset", "Notify reviewer (Slack)"), ("Notify reviewer (Slack)", "Review & approve"),
+        ("Review & approve", "Resolve decision") )),
+    ("Resolve decision", "Record decision"),
     ("Record decision", "Read assets"), ("Read assets", "Read all workflows"),
     ("Read all workflows", "Registry rows"), ("Registry rows", "Snapshot registry"), ("Snapshot registry", "Return to caller"),
 )
@@ -504,20 +561,10 @@ return $input.all().map((it, i) => {
   return { json: { ...src[i].json }, binary: it.binary };
 });
 """
-PREPARE_PUBLISH_JS = r"""
-// One shell command that publishes every approved item (Buffer is not available in expressions, so this lives in Code).
-const cmds = ['mkdir -p /data/published'];
-const ids = [];
-for (const it of $input.all()) {
-  const j = it.json;
-  if (!j.labelled_path) continue;
-  const rec = { id: j.id, published_at: new Date().toISOString(), file: '/data/published/' + String(j.labelled_path).split('/').pop(),
-                disclosure: j.disclosure_sentence, reviewer: j.reviewer, disclosure_status: j.disclosure_status };
-  const b64 = Buffer.from(JSON.stringify(rec, null, 2)).toString('base64');
-  cmds.push(`cp "${j.labelled_path}" /data/published/`, `printf %s ${b64} | base64 -d > /data/published/${j.id}.json`);
-  ids.push(j.id);
-}
-return [{ json: { published_ids: ids, publish_cmd: cmds.join(' && ') } }];
+PUBLISH_NAME_JS = r"""
+// Where the approved file goes. One item per approved asset; the two file nodes after this copy it.
+return $input.all().filter(it => it.json.labelled_path).map(it => ({ json: { ...it.json,
+  published_path: '/data/published/' + String(it.json.labelled_path).split('/').pop() } }));
 """
 host_nodes = [
     node("Notice text", "n8n-nodes-base.formTrigger", 2.2, {
@@ -539,8 +586,9 @@ host_nodes = [
     node("Human approved?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "strict", "version": 2},
         "conditions": [{"id": nid(), "leftValue": "={{ $json.approved }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": True}}],
         "combinator": "and"}, "options": {}}, X(6), 200),
-    node("Prepare publish", "n8n-nodes-base.code", 2, {"jsCode": PREPARE_PUBLISH_JS.strip()}, X(7), 100),
-    node("Publish to site [exit]", "n8n-nodes-base.executeCommand", 1, {"command": "={{ $json.publish_cmd }}"}, X(8), 100),
+    node("Prepare publish", "n8n-nodes-base.code", 2, {"jsCode": PUBLISH_NAME_JS.strip()}, X(7), 100),
+    node("Read approved file", "n8n-nodes-base.readWriteFile", 1, {"operation": "read", "fileSelector": "={{ $json.labelled_path }}", "options": {"dataPropertyName": "data"}}, X(8), 100),
+    node("Publish to site [exit]", "n8n-nodes-base.readWriteFile", 1, {"operation": "write", "fileName": "={{ $('Prepare publish').item.json.published_path }}", "dataPropertyName": "data", "options": {}}, X(9), 100),
     node("Returned, not published", "n8n-nodes-base.noOp", 1, {}, X(7), 300),
     node("What this line is", "n8n-nodes-base.stickyNote", 1, {"width": 1500, "height": 110, "content":
         "## A real production line with the kit as a module\nnotice → **Kokoro-82M**, three stock voices (local, no cloned person) → **AI Act gate** (Loop Over Items → Execute Sub-workflow, the parent waits for the human) → publish only what was approved. "
@@ -550,7 +598,7 @@ host = {"id": HOST_ID, "name": "Recycling notice · three voices", "nodes": host
         "connections": wire(("Notice text", "Three voices"), ("Three voices", "Kokoro TTS (local)"), ("Kokoro TTS (local)", "Attach fields"),
                             ("Attach fields", "One voice at a time"), ("One voice at a time", "Human approved?", 0), ("One voice at a time", "AI Act gate", 1),
                             ("AI Act gate", "One voice at a time"),
-                            ("Human approved?", "Prepare publish", 0), ("Prepare publish", "Publish to site [exit]"), ("Human approved?", "Returned, not published", 1)),
+                            ("Human approved?", "Prepare publish", 0), ("Prepare publish", "Read approved file"), ("Read approved file", "Publish to site [exit]"), ("Human approved?", "Returned, not published", 1)),
         "active": False, "settings": {"executionOrder": "v1", "saveManualExecutions": True}}
 
 for name, wf in (("transparency-kit.json", kit), ("audit-view.json", audit), ("host-line.json", host)):
