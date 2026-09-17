@@ -1,0 +1,25 @@
+{
+  "id": "SampleMoodInbox1",
+  "name": "Sample: support inbox mood scoring (no notice)",
+  "active": false,
+  "nodes": [
+    {"id": "a1b2c3d4-0301-4000-8000-samplemood001", "name": "New support email", "type": "n8n-nodes-base.gmailTrigger", "typeVersion": 1.2, "position": [0, 300],
+     "parameters": {"pollTimes": {"item": [{"mode": "everyMinute"}]}, "filters": {}}},
+    {"id": "a1b2c3d4-0302-4000-8000-samplemood002", "name": "Score customer emotion (Hume)", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240, 300],
+     "parameters": {"method": "POST", "url": "https://api.hume.ai/v0/batch/jobs", "sendBody": true, "specifyBody": "json",
+                    "jsonBody": "={{ JSON.stringify({ models: { language: {} }, text: [$json.text] }) }}", "options": {}}},
+    {"id": "a1b2c3d4-0303-4000-8000-samplemood003", "name": "Route angry customers to a senior", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [480, 300],
+     "parameters": {"conditions": {"options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                    "conditions": [{"id": "c1", "leftValue": "={{ $json.anger }}", "rightValue": 0.6, "operator": {"type": "number", "operation": "gt"}}], "combinator": "and"}, "options": {}}},
+    {"id": "a1b2c3d4-0304-4000-8000-samplemood004", "name": "Log mood to sheet", "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.5, "position": [720, 300],
+     "parameters": {"operation": "append", "documentId": {"__rl": true, "mode": "id", "value": "sheet-id"}, "sheetName": {"__rl": true, "mode": "name", "value": "mood"}, "columns": {"mappingMode": "autoMapInputData", "value": {}}, "options": {}}},
+    {"id": "a1b2c3d4-0305-4000-8000-samplemood005", "name": "Why this is here", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [0, 100],
+     "parameters": {"width": 900, "height": 110, "content": "## Sample line — emotion recognition on people who are not told\nA support inbox scored for customer emotion. Nothing is published, so a publishing-only check would call it *internal*. Under Art. 50(3) the people exposed to an emotion-recognition system must be informed regardless. Inactive, no credentials; the registry flags it **inform**. Add a node tagged `[persons informed]` and it turns green."}}
+  ],
+  "connections": {
+    "New support email": {"main": [[{"node": "Score customer emotion (Hume)", "type": "main", "index": 0}]]},
+    "Score customer emotion (Hume)": {"main": [[{"node": "Route angry customers to a senior", "type": "main", "index": 0}]]},
+    "Route angry customers to a senior": {"main": [[{"node": "Log mood to sheet", "type": "main", "index": 0}], [{"node": "Log mood to sheet", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

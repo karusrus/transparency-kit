@@ -76,7 +76,11 @@ const now = new Date();
 const id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);
 const type = String(g('Asset type', 'asset_type') || '').toLowerCase();
 const yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());
-const realPerson = yes(g('Depicts a real person (face or voice)?', 'depicts_real_person'));
+const shows = String(g('What does it show?', 'shows') || (yes(g('Depicts a real person (face or voice)?', 'depicts_real_person')) ? 'a real person (face or voice)' : 'nothing real')).toLowerCase();
+const realPerson = /person|face|voice/.test(shows);
+const realThing = /object|place|event|entity/.test(shows);
+const manipulated = /manipulat/.test(String(g('Generated or manipulated?', 'origin') || 'generated').toLowerCase());
+const artistic = yes(g('Artistic, creative or satirical work?', 'artistic'));
 const publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));
 const lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();
 const model = String(g('Model', 'model') || '');
@@ -89,7 +93,7 @@ const shellSafe = (v) => String(v ?? '').replace(/[^\p{L}\p{N} .,;:()\-_/§·]/g
 
 // Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.
 const DISCLOSURE = {
-  en: (m) => `This ${type} was created with an AI system (${m}).`,
+  en: (m) => manipulated ? `This ${type} was altered with an AI system (${m}).` : `This ${type} was created with an AI system (${m}).`,
   bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,
   ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,
   de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,
@@ -107,10 +111,12 @@ if (type === 'text') {
     obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');
   }
 } else {
-  if (realPerson) {
-    category = 'deepfake'; label_required = true; label_basis = 'law';
-    obligations.push('Art. 50(4) §1 — image, audio or video resembling a real person must carry a disclosure that it is artificially generated or manipulated (deep fake, Art. 3(60)). Artistic or satirical works: disclosure may be limited so it does not hamper the work.');
-    other_law.push('Consent or another legal basis for using the person\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');
+  if (realPerson || realThing) {
+    // Art. 3(60): content resembling existing persons, objects, places, entities or events that would falsely appear authentic
+    category = 'deepfake'; label_required = true; label_basis = artistic ? 'law (limited: artistic work)' : 'law';
+    obligations.push('Art. 3(60) deep fake: ' + (manipulated ? 'manipulated' : 'generated') + ' content resembling ' + (realPerson ? 'a real person' : 'a real object, place or event') + ' that would appear authentic.');
+    obligations.push('Art. 50(4) §1 — disclose that the content is artificially ' + (manipulated ? 'manipulated' : 'generated') + '.' + (artistic ? ' Artistic, creative or satirical work: the disclosure may be limited so it does not hamper the work — still present, in an appropriate form.' : ''));
+    if (realPerson) other_law.push('Consent or another legal basis for using the person\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');
   } else {
     category = 'synthetic_media';
     label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));
@@ -119,11 +125,13 @@ if (type === 'text') {
   }
 }
 
-const label_text = 'AI-generated · EU AI Act Art. 50';
+const label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' · EU AI Act Art. 50';
 const inPath  = `/data/incoming/${id}${ext}`;
 const outPath = `/data/labelled/${id}${ext}`;
 const font = '/usr/share/fonts/DejaVuSans.ttf';
-const draw = `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;
+const draw = artistic
+  ? `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white@0.85:fontsize=h/48:box=1:boxcolor=black@0.35:boxborderw=6:x=w-tw-14:y=h-th-14`
+  : `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;
 const meta = `-metadata comment="${label_text}; manifest ${id}" -metadata title="${shellSafe(disclosure_sentence)}"`;
 let ffmpeg_cmd = '';
 if (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i "${inPath}" -vf "${draw}" ${meta} "${outPath}"`;
@@ -138,7 +146,7 @@ const manifest = {
   model, model_version: String(g('Model version', 'model_version') || ''),
   prompt_sha256: f.prompt_sha256 || '',
   operator: String(g('Operator', 'operator') || ''),
-  depicts_real_person: realPerson, consent_reference: String(g('Consent reference', 'consent_reference') || ''),
+  depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),
   public_information: publicInfo,
   source_file: file ? file.fileName : null,
   incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,
@@ -210,6 +218,9 @@ const wfs = $input.all().map(i => i.json).filter(w => w && Array.isArray(w.nodes
 const AI_TYPE = /langchain|openai|anthropic|ollama|gemini|mistral|huggingface|groq|cohere|deepseek|perplexity|xai|elevenlabs|replicate|stability|bedrock|vertex|azureopenai|heygen|midjourney|runway|bannerbear|kokoro/i;
 const AI_HOST = /api\.openai\.com|api\.anthropic\.com|:11434|:8880|kokoro|api\.elevenlabs\.io|api\.replicate\.com|api\.stability\.ai|generativelanguage\.googleapis|api\.mistral\.ai|api\.heygen\.com|api\.bannerbear\.com|api\.groq\.com|api\.cohere|api\.deepseek\.com|api\.x\.ai|openrouter\.ai|api\.d-id\.com|api\.synthesia\.io/i;
 const LIKENESS = /elevenlabs|heygen|d-id|synthesia|voice.?clone|clone/i;             // can reproduce a real face or voice
+const EMOTION = /emotion|sentiment.?of.?face|facial|face.?analy|biometric|hume\.ai|api\.hume|affectiva|rekognition|azure.*face|face\+\+|faceplusplus|detect.?face|age.?gender/i;   // Art. 50(3): emotion recognition / biometric categorisation
+const CHATBOT = /chatTrigger|chat.?trigger|n8n-nodes-langchain\.agent|conversational|chatbot|assistant/i;   // Art. 50(1): interacts with natural persons (provider duty, checked for awareness)
+const INFORMED = /\[persons informed\]|\[ai disclosed\]/i;   // convention: tag the node that informs people
 const EXIT_TYPE = /linkedIn|twitter|facebook|instagram|youTube|tiktok|wordpress|ghost|webflow|contentful|mailchimp|brevo|sendinblue|sendgrid|mailgun|emailSend|gmail|microsoftOutlook|telegram|whatsApp|twilio|messageBird|discord|reddit|medium|hubspot|activeCampaign|klaviyo/i;
 const GATE_TYPE = /n8n-nodes-base\.form$|n8n-nodes-base\.wait$/;
 const GATE_OP = /sendAndWait|approval/i;
@@ -227,7 +238,10 @@ function classify(n) {
   const exit = EXIT_TYPE.test(n.type) || NAME_EXIT.test(n.name);
   const maybeExit = !exit && !gen && ((/httpRequest$/.test(n.type) && url && !AI_HOST.test(url) && !/host\.docker\.internal|localhost|127\.0\.0\.1/.test(url))
                     || /slack|notion|googleSheets|airtable|microsoftTeams|mattermost/i.test(n.type));
-  return { gen, gate, disclose, exit, maybeExit, isKit, likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };
+  const emotion = EMOTION.test(n.type) || EMOTION.test(n.name) || EMOTION.test(url);
+  const chatbot = CHATBOT.test(n.type) || (CHATBOT.test(n.name) && gen);
+  return { gen: gen || emotion || chatbot, gate, disclose, exit, maybeExit, isKit, emotion, chatbot, informed: INFORMED.test(n.name),
+           likeness: gen && (LIKENESS.test(n.type) || LIKENESS.test(n.name) || LIKENESS.test(url)) };
 }
 
 function modelOf(n) {
@@ -283,7 +297,15 @@ function analyse(w) {
     const real = paths.filter(p => p.kind === 'exit'), maybe = paths.filter(p => p.kind === 'maybe');
     let status, evidence;
     const fmt = (p) => p.trail.join(' → ');
-    if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }
+    const informedInWf = nodes.some(x => cls[x.name].informed && !x.disabled);
+    if (c.emotion) {
+      // Art. 50(3): the duty exists whenever the system runs on people, publishing or not
+      status = informedInWf ? 'informed' : 'inform';
+      evidence = informedInWf ? 'emotion/biometric system; a node tagged [persons informed] exists in this workflow' : 'emotion recognition or biometric categorisation runs on people — they must be informed (Art. 50(3)); no node tagged [persons informed] in this workflow';
+    } else if (c.chatbot) {
+      status = informedInWf ? 'informed' : 'chatbot';
+      evidence = informedInWf ? 'people are told they talk to an AI (node tagged [ai disclosed])' : 'interacts with natural persons — the provider must make the AI nature clear unless obvious (Art. 50(1)); no node tagged [ai disclosed] in this workflow';
+    } else if (!real.length && !maybe.length) { status = 'internal'; evidence = 'no path from this node reaches a publishing node'; }
     else if (real.some(p => !p.disc && !p.gate)) { const p = real.find(p => !p.disc && !p.gate); status = 'uncovered'; evidence = fmt(p) + ' — no disclosure, no human gate on this path'; }
     else if (c.likeness && real.some(p => !p.disc)) { const p = real.find(p => !p.disc); status = 'likeness'; evidence = fmt(p) + ' — face/voice generator reaches people without a disclosure step (gate alone is not enough for Art. 50(4) §1)'; }
     else if (real.length && real.every(p => p.disc)) { status = 'disclosed'; evidence = fmt(real[0]); }
@@ -292,7 +314,7 @@ function analyse(w) {
     if (status === 'disclosed' && maybe.some(p => !p.disc && !p.gate)) { status = 'verify'; evidence = fmt(maybe.find(p => !p.disc && !p.gate)) + ' — destination may or may not reach people; mark the node [exit] or leave it'; }
     rows.push({ system: n.name, source: 'workflow node', workflow: w.name, workflow_id: w.id, workflow_active: !!w.active,
                 node_type: n.type.replace('@n8n/n8n-nodes-langchain.', 'langchain.').replace('n8n-nodes-base.', ''), model: modelOf(n),
-                role: 'deployer', likeness: c.likeness, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),
+                role: 'deployer', likeness: c.likeness, emotion: c.emotion, chatbot: c.chatbot, exits: real.map(p => p.exit).filter((v, i, a) => a.indexOf(v) === i),
                 path_status: status, evidence, first_seen: new Date().toISOString().slice(0,10) });
   }
   return rows;
@@ -317,11 +339,11 @@ for (const row of $('Read assets').all()) {
   } catch (e) {}
 }
 rows.push(...seen.values());
-const order = { uncovered: 0, likeness: 1, editorial: 2, verify: 3, disclosed: 4, internal: 5 };
+const order = { uncovered: 0, likeness: 1, inform: 2, editorial: 3, chatbot: 4, verify: 5, disclosed: 6, informed: 7, internal: 8 };
 rows.sort((a, b) => (order[a.path_status] ?? 9) - (order[b.path_status] ?? 9));
 const registry = { generated_at: new Date().toISOString(), instance_workflows: wfs.length, registry_partial: wfs.length === 0,
                    workflows_scanned: wfs.map(w => ({ id: w.id, name: w.name, active: !!w.active })),
-                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure',
+                   rules: 'internal: no path to a publishing node · disclosed: every path passes a disclosure step (this kit or a node tagged [AI disclosure]) · editorial: human gate only, text with a named responsible person · verify: destination unclear, tag it [exit] · uncovered: a path reaches people with neither · likeness: face/voice generator reaches people without disclosure · inform: emotion/biometric system runs on people who are not told (Art. 50(3)), tag the node that tells them [persons informed] · chatbot: talks to people without saying it is an AI (Art. 50(1)), tag [ai disclosed]',
                    systems: rows };
 return [{ json: { systems: rows.length, workflows: wfs.length, partial: wfs.length === 0, registry } }];
 """.replace('__KIT_ID__', KIT_ID)
@@ -343,6 +365,7 @@ GATE_HTML = ("={{ (() => { const m = $('Build manifest').first().json; const esc
              " + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>'"
              " + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>'"
              " + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '')"
+             " + '<p style=\"margin:0 0 8px\">Shows: ' + esc(m.shows) + ' · ' + (m.manipulated ? 'manipulated' : 'generated') + (m.artistic ? ' · artistic/satirical work' : '') + '</p>'"
              " + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '')"
              " + (m.labelled_path ? '<p style=\"margin:0 0 8px\">Labelled file: <code>' + esc(m.labelled_path) + '</code>' + (m.label_exit_code ? ' · <span style=\"color:#b91c1c\">ffmpeg exit ' + esc(m.label_exit_code) + '</span>' : ' · label applied') + '</p>' : '')"
              " + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '')"
@@ -370,7 +393,9 @@ kit_nodes = [
             {"fieldLabel": "Model version", "placeholder": "optional"},
             {"fieldLabel": "Prompt", "fieldType": "textarea", "requiredField": True},
             {"fieldLabel": "Operator", "placeholder": "who ran the generation", "requiredField": True},
-            {"fieldLabel": "Depicts a real person (face or voice)?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
+            {"fieldLabel": "What does it show?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "nothing real"}, {"option": "a real person (face or voice)"}, {"option": "a real object, place or event"}]}, "requiredField": True},
+            {"fieldLabel": "Generated or manipulated?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "generated"}, {"option": "manipulated (real footage altered)"}]}, "requiredField": True},
+            {"fieldLabel": "Artistic, creative or satirical work?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
             {"fieldLabel": "Consent reference", "placeholder": "link or id of the person's consent, if a real person is depicted"},
             {"fieldLabel": "Published to inform the public on a matter of public interest?", "fieldType": "dropdown", "fieldOptions": {"values": [{"option": "no"}, {"option": "yes"}]}, "requiredField": True},
             {"fieldLabel": "Text content", "fieldType": "textarea", "placeholder": "for text assets"},
@@ -466,7 +491,7 @@ const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
 return ['af_bella', 'am_adam', 'bf_emma'].map(voice => ({ json: {
   voice, text, notice_id: stamp,
   asset_type: 'audio', language: 'en', model: 'Kokoro-82M', model_version: voice, prompt: text, operator,
-  depicts_real_person: 'no', consent_reference: '', public_information: 'yes',
+  shows: 'nothing real', origin: 'generated', artistic: 'no', depicts_real_person: 'no', consent_reference: '', public_information: 'yes',
   caller_workflow: $workflow.name,
 } }));
 """

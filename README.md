@@ -13,8 +13,8 @@ Importable n8n workflows that make EU AI Act transparency a property of the prod
 
 | Input | Category | Duty (deployer) | What the kit does |
 |---|---|---|---|
-| image / video / audio, **real person depicted** | `deepfake` | Art. 50(4) §1: disclose that it is generated or manipulated | visible label burnt in with ffmpeg, metadata comment, consent reference required, manifest |
-| image / video / audio, no real person | `synthetic_media` | Art. 50(2) marking is the provider's duty | label by house policy on image and video, manifest |
+| image / video / audio showing **a real person, object, place or event** (generated or manipulated) | `deepfake` (Art. 3(60)) | Art. 50(4) §1: disclose that it is artificially generated or manipulated; limited form allowed for artistic, creative or satirical work | label burnt in with ffmpeg (“AI-generated” or “AI-manipulated”; small corner label when artistic), metadata, manifest; consent asked for people (GDPR, not the AI Act) |
+| image / video / audio showing **nothing real** | `synthetic_media` | Art. 50(2) marking is the provider's duty | label by house policy on image and video, manifest |
 | text, **published to inform the public** | `generated_public_text` | Art. 50(4) §2: disclose, unless a named person holds editorial responsibility | disclosure footer prepared; the gate can replace it with an *editorial exception* and records who signed |
 | text, internal | `internal_text` | none | manifest only |
 
@@ -41,6 +41,10 @@ Only media files (incoming and labelled) stay on disk under `data/`. The kit kee
 - `form` (default) — a Wait node with a form. Works anywhere; the link is on the audit view and, if a Slack credential is attached, posted to `#ai-act-gate` by **Notify reviewer**. Reviewer identity is whatever the person types.
 - `slack` — Slack **Send and Wait** with the same form in the channel. Only channel members can answer, which is the practical identity control most teams have. Needs a Slack credential on the node; untested here until one is attached.
 
+## Numbers
+
+`tools/stats.sh` reads the three numbers an operations lead is asked for straight from the ledger: assets through the gate, share returned, median and p90 decision time, distinct reviewers, decisions in the chain and whether the chain verifies. Run `demo.sh` a few times (`REVIEWER=… DECIDE_DELAY=…`) or, better, real assets with a second reviewer.
+
 ## Embedding the kit in a line
 
 ```
@@ -64,6 +68,9 @@ The Act does not regulate links between nodes; it regulates what reaches people.
 | `verify` | a destination that may or may not reach people (unknown HTTP host, Slack, Notion, Sheets) | a person decides; tag the node `[exit]` or leave it |
 | `uncovered` | a path reaches people with neither | AI content goes out without disclosure and without a responsible person |
 | `likeness` | a face or voice generator (ElevenLabs, HeyGen, D-ID, Synthesia, voice clones) reaches people without a disclosure step, even through a gate | deep fakes need disclosure regardless, Art. 50(4) §1 |
+| `inform` | an emotion-recognition or biometric-categorisation system runs on people and no node in the workflow is tagged `[persons informed]` | the exposed people must be informed, Art. 50(3), publishing or not |
+| `chatbot` | a system interacts with people (chat trigger, agent) and no node is tagged `[ai disclosed]` | people must be told they talk to an AI unless obvious, Art. 50(1) |
+| `informed` | one of the two above with the tag present | duty covered |
 
 Each row carries its evidence: the chain of nodes, e.g. `Draft post with GPT → Voice-over (ElevenLabs) → Publish to LinkedIn — no disclosure, no human gate on this path`. What the graph cannot know stays a human declaration: whether a real person is depicted, whether a text informs the public, whether a Slack channel is internal.
 
@@ -77,7 +84,7 @@ Each row carries its evidence: the chain of nodes, e.g. `Draft post with GPT →
 | 3 | Generated text | Art. 50(4) §2 | manifests: disclosed or editorial exception, responsible person |
 | 4 | Approval log | Art. 14; Art. 12 (mandatory only for high-risk, kept voluntarily) | one record per decision: who, what, when, why, artefact, execution id |
 
-`workflows/sample-line.json` is a typical marketing automation (GPT drafts a post, ElevenLabs voices it, LinkedIn publishes), inactive and without credentials. The registry flags both generators `uncovered` with the exact path.
+Three inactive sample lines exist so the registry has something to judge: `sample-line.json` (GPT drafts a post, ElevenLabs voices it, LinkedIn publishes: both generators `uncovered`), `sample-50-3.json` (a support inbox scored for customer emotion, nothing published: `inform`), `sample-chatbot.json` (a bot that answers as “Anna from support”: `chatbot`).
 
 Scope is deliberate: deployer duties under Article 50 (in force 2 August 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed.
 

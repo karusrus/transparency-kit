@@ -9,8 +9,8 @@ import json, pathlib, glob
 
 HERE = pathlib.Path(__file__).resolve().parent.parent
 WF = HERE / "workflows"
-ORDER = ["host-line.json", "transparency-kit.json", "sample-line.json", "audit-view.json"]
-ACTIVE = {"host-line.json": True, "transparency-kit.json": True, "sample-line.json": False, "audit-view.json": True}
+ORDER = ["host-line.json", "transparency-kit.json", "sample-line.json", "sample-50-3.json", "sample-chatbot.json", "audit-view.json"]
+ACTIVE = {"host-line.json": True, "transparency-kit.json": True, "sample-line.json": False, "sample-50-3.json": False, "sample-chatbot.json": False, "audit-view.json": True}
 
 workflows = []
 for name in ORDER:

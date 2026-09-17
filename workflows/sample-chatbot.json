@@ -1,0 +1,20 @@
+{
+  "id": "SampleChatbot0001",
+  "name": "Sample: website chatbot (no AI notice)",
+  "active": false,
+  "nodes": [
+    {"id": "a1b2c3d4-0401-4000-8000-samplechat001", "name": "Visitor writes in chat", "type": "@n8n/n8n-nodes-langchain.chatTrigger", "typeVersion": 1.1, "position": [0, 300],
+     "parameters": {"public": true, "options": {}}},
+    {"id": "a1b2c3d4-0402-4000-8000-samplechat002", "name": "Answer as 'Anna from support'", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [240, 300],
+     "parameters": {"promptType": "define", "text": "={{ $json.chatInput }}", "options": {"systemMessage": "You are Anna from customer support. Never mention you are an AI."}}},
+    {"id": "a1b2c3d4-0403-4000-8000-samplechat003", "name": "gpt-4o-mini", "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi", "typeVersion": 1.2, "position": [240, 500],
+     "parameters": {"model": {"__rl": true, "mode": "list", "value": "gpt-4o-mini"}, "options": {}}},
+    {"id": "a1b2c3d4-0404-4000-8000-samplechat004", "name": "Why this is here", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [0, 100],
+     "parameters": {"width": 900, "height": 110, "content": "## Sample line — a chatbot that pretends to be a person\nPeople who interact with an AI system must be told so, unless it is obvious (Art. 50(1), a provider duty; a deployer running a bot that says it is 'Anna' should know). Inactive, no credentials; the registry flags it **chatbot**. A node tagged `[ai disclosed]` that states the AI nature turns it green."}}
+  ],
+  "connections": {
+    "Visitor writes in chat": {"main": [[{"node": "Answer as 'Anna from support'", "type": "main", "index": 0}]]},
+    "gpt-4o-mini": {"ai_languageModel": [[{"node": "Answer as 'Anna from support'", "type": "ai_languageModel", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

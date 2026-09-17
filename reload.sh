@@ -22,7 +22,7 @@ docker run -d --name n8n --network kit-net -p 5678:5678 --add-host host.docker.i
   n8n-ffmpeg >/dev/null
 sleep 16
 docker exec n8n n8n import:credentials --input=/secrets/postgres-credential.json | tail -1
-for f in transparency-kit audit-view sample-line host-line; do docker exec n8n n8n import:workflow --input=/workflows/$f.json | tail -1; done
+for f in transparency-kit audit-view sample-line sample-50-3 sample-chatbot host-line; do docker exec n8n n8n import:workflow --input=/workflows/$f.json | tail -1; done
 for id in AiActTransparenc AiActAuditView00 RecyclingVoices1; do docker exec n8n n8n publish:workflow --id=$id >/dev/null; done
 docker restart n8n >/dev/null
 sleep 22

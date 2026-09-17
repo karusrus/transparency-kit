@@ -3,7 +3,7 @@
   "name": "Recycling notice · three voices",
   "nodes": [
     {
-      "id": "463c9945-6f2d-47d9-a5c6-1c171ba6ebb6",
+      "id": "f5f85020-dd85-4a47-9313-d718986052c5",
       "name": "Notice text",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -34,7 +34,7 @@
       "webhookId": "a1b2c3d4-0201-4000-8000-hostnotice001"
     },
     {
-      "id": "44d9a318-2f35-4219-a01a-49de1bdeaf08",
+      "id": "cf8148dc-bdb6-4f53-8c63-c07a8c1d5f55",
       "name": "Three voices",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -43,11 +43,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// One item per voice. Fields the AI Act gate expects travel with the item (snake_case).\nconst f = $input.first().json;\nconst text = String(f['Notice text'] || '').trim();\nconst operator = String(f['Operator'] || 'unknown');\nconst stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');\nreturn ['af_bella', 'am_adam', 'bf_emma'].map(voice => ({ json: {\n  voice, text, notice_id: stamp,\n  asset_type: 'audio', language: 'en', model: 'Kokoro-82M', model_version: voice, prompt: text, operator,\n  depicts_real_person: 'no', consent_reference: '', public_information: 'yes',\n  caller_workflow: $workflow.name,\n} }));"
+        "jsCode": "// One item per voice. Fields the AI Act gate expects travel with the item (snake_case).\nconst f = $input.first().json;\nconst text = String(f['Notice text'] || '').trim();\nconst operator = String(f['Operator'] || 'unknown');\nconst stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');\nreturn ['af_bella', 'am_adam', 'bf_emma'].map(voice => ({ json: {\n  voice, text, notice_id: stamp,\n  asset_type: 'audio', language: 'en', model: 'Kokoro-82M', model_version: voice, prompt: text, operator,\n  shows: 'nothing real', origin: 'generated', artistic: 'no', depicts_real_person: 'no', consent_reference: '', public_information: 'yes',\n  caller_workflow: $workflow.name,\n} }));"
       }
     },
     {
-      "id": "2c93d568-3b50-4765-938c-2ac1f92c59d5",
+      "id": "4d11570d-b901-454b-8f8f-ae80405cb20d",
       "name": "Kokoro TTS (local)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -73,7 +73,7 @@
       }
     },
     {
-      "id": "22999650-d124-447e-8145-a5364c1a0269",
+      "id": "fafb7d26-dc6c-4f46-8f79-152b2246263d",
       "name": "Attach fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -86,7 +86,7 @@
       }
     },
     {
-      "id": "ad7d5b2b-b711-4f07-b7e6-0c7ea342fed9",
+      "id": "98a71352-7ddb-4988-8988-22e8c62f6655",
       "name": "One voice at a time",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -100,7 +100,7 @@
       }
     },
     {
-      "id": "1e1ad96b-95c1-403a-b3e2-70f97e6caf04",
+      "id": "fa379b3f-dfd4-4a65-9816-a48cf15eafde",
       "name": "AI Act gate",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
@@ -121,7 +121,7 @@
       }
     },
     {
-      "id": "4a38338e-8301-4f8c-9f50-9e806484d8d7",
+      "id": "fcefd4cd-1283-4179-af18-2bf12cde7e1f",
       "name": "Human approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -139,7 +139,7 @@
           },
           "conditions": [
             {
-              "id": "1d1a62b4-86ce-47f1-91ce-9c7abc7eeb4c",
+              "id": "4dbfcddb-b3d4-4e1b-ad74-6b2b44c61c79",
               "leftValue": "={{ $json.approved }}",
               "rightValue": "",
               "operator": {
@@ -155,7 +155,7 @@
       }
     },
     {
-      "id": "2dfa4dbf-ca5e-4b0b-82ff-d41f0fe58add",
+      "id": "8d07a760-59ac-4979-a5e2-5130a8ea448d",
       "name": "Prepare publish",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -168,7 +168,7 @@
       }
     },
     {
-      "id": "bd7d4b5b-7eb0-4040-8bc3-6b47fb619ff9",
+      "id": "30edd694-bab6-4777-8f45-3853abc6c397",
       "name": "Publish to site [exit]",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -181,7 +181,7 @@
       }
     },
     {
-      "id": "1cbfb264-866a-41f5-abc4-01a47b873874",
+      "id": "630e543d-94d7-4662-8d73-7abe7936c594",
       "name": "Returned, not published",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -192,7 +192,7 @@
       "parameters": {}
     },
     {
-      "id": "917618aa-88a8-4b9a-88a8-d6a9a6b6c46b",
+      "id": "99f6ae3d-7713-4628-b644-792567b10451",
       "name": "What this line is",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,

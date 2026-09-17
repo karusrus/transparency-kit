@@ -12,7 +12,7 @@ const chain = { len: Number(row.chain_len || 0), broken: Number(row.chain_broken
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const dt = (v) => v ? esc(String(v).replace('T', ' ').slice(0, 16)) : '';
 const pill = (v) => {
-  const map = { approved: 'ok', disclosed: 'ok', editorial_exception: 'warn', not_required: 'muted', pending_review: 'warn', returned: 'bad', 'n/a': 'muted', internal: 'muted', editorial: 'warn', verify: 'warn', uncovered: 'bad', likeness: 'bad' };
+  const map = { approved: 'ok', disclosed: 'ok', editorial_exception: 'warn', not_required: 'muted', pending_review: 'warn', returned: 'bad', 'n/a': 'muted', internal: 'muted', editorial: 'warn', verify: 'warn', uncovered: 'bad', likeness: 'bad', inform: 'bad', chatbot: 'warn', informed: 'ok' };
   return `<span class="pill ${map[v] || 'muted'}">${esc(v)}</span>`;
 };
 const table = (cols, rows) => rows.length
@@ -30,7 +30,7 @@ const blocks = [
     body: table([
       ['Status', r => pill(r.path_status)],
       ['Workflow / line', r => esc(r.workflow) + (r.workflow_active === true ? ' <span class="pill ok">active</span>' : r.workflow_active === false ? ' <span class="pill muted">inactive</span>' : '')],
-      ['System (node)', r => esc(r.system) + (r.likeness ? ' <span class="pill warn">face/voice</span>' : '')], ['Node type', r => `<code>${esc(r.node_type)}</code>`], ['Model', r => esc(r.model)],
+      ['System (node)', r => esc(r.system) + (r.likeness ? ' <span class="pill warn">face/voice</span>' : '') + (r.emotion ? ' <span class="pill bad">emotion/biometric</span>' : '') + (r.chatbot ? ' <span class="pill warn">talks to people</span>' : '')], ['Node type', r => `<code>${esc(r.node_type)}</code>`], ['Model', r => esc(r.model)],
       ['Reaches people via', r => esc((r.exits || []).join(', '))],
       ['Evidence (path)', r => `<span class="ev">${esc(r.evidence)}</span>`],
       ['Source', r => esc(r.source)], ['Assets', r => esc(r.assets || '')],
@@ -39,10 +39,10 @@ const blocks = [
   },
   {
     n: 2, title: 'Synthetic media and deep fakes', art: 'Art. 50(4) §1 · Art. 50(2)',
-    what: 'Images, video and audio. A real person depicted means deep fake: visible disclosure plus consent on file. Provenance manifest for all of them.',
+    what: 'Images, video and audio. Deep fake per Art. 3(60): generated or manipulated content resembling a real person, object, place or event that would appear authentic. Disclosure required; limited form allowed for artistic or satirical work. Provenance manifest for all of them.',
     body: table([
       ['ID', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)],
-      ['Real person', r => r.depicts_real_person ? 'yes' : 'no'], ['Consent', r => esc(r.consent_reference)],
+      ['Shows', r => esc(r.shows || (r.depicts_real_person ? 'a real person' : 'nothing real')) + (r.manipulated ? ' · manipulated' : '') + (r.artistic ? ' · artistic' : '')], ['Consent', r => esc(r.consent_reference)],
       ['Disclosure', r => !r.label_required ? 'none' : r.asset_type === 'audio' ? `metadata + sentence at publication (${esc(r.label_basis)})` : `burnt-in label (${esc(r.label_basis)})`], ['Model', r => esc(r.model + (r.model_version ? ' ' + r.model_version : ''))],
       ['Prompt hash', r => `<code>${esc(String(r.prompt_sha256).slice(0, 12))}</code>`], ['Operator', r => esc(r.operator)],
       ['Status', r => pill(r.disclosure_status || r.status)], ['Artefact', r => esc(r.labelled_path || r.incoming_path || '')],
@@ -93,7 +93,7 @@ code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}pre{white-space:pre-w
 footer{padding:0 32px 40px;color:var(--mut);font-size:12px}
 </style></head><body>
 <header><h1>Audit view · AI Act Transparency Kit</h1><p>What the auditor reads instead of the pipeline. Deployer obligations under the EU AI Act, filled automatically by the line. Generated ${dt(new Date().toISOString())}.</p></header>
-<div class="stats">${stat(systems.length, 'AI systems on the instance')}${stat(systems.filter(r => r.path_status === 'uncovered' || r.path_status === 'likeness').length, 'reach people uncovered')}${stat(systems.filter(r => r.path_status === 'editorial' || r.path_status === 'verify').length, 'need a decision')}${stat(media.length, 'synthetic media assets')}${stat(texts.length, 'generated texts')}${stat(approvals.length, 'decisions logged')}${stat(inbox.length, 'awaiting a human')}</div>
+<div class="stats">${stat(systems.length, 'AI systems on the instance')}${stat(systems.filter(r => r.path_status === 'uncovered' || r.path_status === 'likeness' || r.path_status === 'inform').length, 'people not told')}${stat(systems.filter(r => r.path_status === 'editorial' || r.path_status === 'verify' || r.path_status === 'chatbot').length, 'need a decision')}${stat(media.length, 'synthetic media assets')}${stat(texts.length, 'generated texts')}${stat(approvals.length, 'decisions logged')}${stat(inbox.length, 'awaiting a human')}</div>
 <main>${inbox.length ? `<section><div class="hd"><span class="n">!</span><h2>Awaiting a human</h2><span class="art">the gate · a named person decides</span></div><p class="what">Assets stopped at the gate. Open the link, decide, and the row moves to the approval log.</p><div class="wrap">${table([['Since', r => dt(r.created_at)], ['Line', r => esc(r.line)], ['Asset', r => `<code>${esc(r.id)}</code>`], ['Type', r => esc(r.asset_type)], ['Category', r => pill(r.category)], ['Model', r => esc(r.model)], ['Operator', r => esc(r.operator)], ['Gate', r => `<a href="${esc(r.gate_url)}">open the gate →</a>`]], inbox)}</div></section>` : ''}${blocks.map(b => `<section><div class="hd"><span class="n">${b.n}</span><h2>${esc(b.title)}</h2><span class="art">${esc(b.art)}</span></div><p class="what">${esc(b.what)}</p><div class="wrap">${b.body}</div>${b.foot ? `<p class="foot">${b.foot}</p>` : ''}</section>`).join('')}</main>
 <footer>${chainLine}<br>Scope: deployer duties under Article 50 (in force 2 Aug 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed. Sources: files under /data written by the “AI Act Transparency Kit” workflow.</footer>
 </body></html>`;
