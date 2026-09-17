@@ -64,7 +64,7 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
         <p class="kicker">Line 2 · the governance</p>
         <h3>The same gate, now producing evidence</h3>
         <p>Text → three synthetic voices → <b>AI Act gate</b> → publish only what a person approved. The registry reads every workflow on the instance and flags the ones where AI output reaches people with no disclosure and no human.</p>
-        <div class="num" id="n-cov">6<small>AI systems found · 2 uncovered · 4 decisions logged</small></div>
+        <div class="num" id="n-cov">18<small>AI systems found · 2 uncovered · 1 must inform · 2 chatbot · 30 decisions in a hash-chained ledger</small></div>
         <p><a href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2">Open the live map →</a></p>
       </div>
     </div>
@@ -88,6 +88,16 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
 </section>
 
 <section>
+  <h2>Deep fakes as the Act defines them</h2>
+  <p class="sub">Art. 3(60): generated <em>or manipulated</em> content resembling a real person, object, place or event that would appear authentic. No person needed. The intake asks what is shown, whether the footage was altered, and whether it is an artistic or satirical work; the label follows.</p>
+  <div class="shots">
+    <figure><img src="labelled-manipulated.jpg" alt="Manipulated image of a real place with the full label"><figcaption>A real place, altered: full label, “AI-manipulated”, the disclosure sentence in the asset's language goes with the file.</figcaption></figure>
+    <figure><img src="labelled-satire.jpg" alt="The same alteration as a satirical work with a limited corner label"><figcaption>The same alteration declared as satire: disclosure limited to a small corner label, as Art. 50(4) allows for artistic work, still present.</figcaption></figure>
+  </div>
+  <p class="sub">Systems, not assets: emotion recognition and biometric categorisation must inform the people exposed (Art. 50(3)), chatbots must say they are AI (Art. 50(1)). The registry flags both from the workflow graph, publishing or not.</p>
+</section>
+
+<section>
   <h2>How a line is judged</h2>
   <p class="sub">The Act does not regulate links between nodes; it regulates what reaches people. From every node that calls a model, every path forward to a publishing node is walked, and what stood in between decides the verdict.</p>
   <table>
@@ -98,6 +108,8 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
     <tr><td><span class="pill warn">verify</span></td><td>a destination that may or may not reach people</td><td>a person decides; tag the node</td></tr>
     <tr><td><span class="pill bad">uncovered</span></td><td>a path reaches people with neither</td><td>AI content goes out with no disclosure and no responsible person</td></tr>
     <tr><td><span class="pill bad">likeness</span></td><td>a face or voice generator reaches people without a disclosure step</td><td>deep fakes need disclosure regardless of a gate, Art. 50(4) §1</td></tr>
+    <tr><td><span class="pill bad">inform</span></td><td>emotion recognition or biometric categorisation runs on people who are not told</td><td>Art. 50(3), publishing or not; tag the node that informs them</td></tr>
+    <tr><td><span class="pill warn">chatbot</span></td><td>a system talks to people without saying it is an AI</td><td>Art. 50(1); tag the node that discloses it</td></tr>
   </table>
 </section>
 

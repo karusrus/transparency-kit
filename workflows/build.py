@@ -125,7 +125,7 @@ if (type === 'text') {
   }
 }
 
-const label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' · EU AI Act Art. 50';
+const label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: drawtext in this ffmpeg build drops the last glyph after a multibyte character
 const inPath  = `/data/incoming/${id}${ext}`;
 const outPath = `/data/labelled/${id}${ext}`;
 const font = '/usr/share/fonts/DejaVuSans.ttf';

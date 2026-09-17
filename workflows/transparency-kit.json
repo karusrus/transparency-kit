@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "a35de24e-b01b-479e-8564-403e5aed69b7",
+      "id": "15fe5081-dbb3-48fa-a604-a400adc6ee5c",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -163,7 +163,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "f390ed6f-cc0e-4582-ada6-6da4e19945f2",
+      "id": "7a8f6eb8-026a-495d-b763-5d8e783eedb6",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -176,7 +176,7 @@
       }
     },
     {
-      "id": "34cf0f4b-306c-440d-ad95-9ffc5147d913",
+      "id": "ff9b9ee6-1f88-4e94-b15c-e94ef732677f",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -192,7 +192,7 @@
       }
     },
     {
-      "id": "a0b08c92-e167-4aec-8a03-a825c50aeecd",
+      "id": "05ad0adb-dc97-4c03-a4e2-ea170f7d09ca",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -201,11 +201,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst shows = String(g('What does it show?', 'shows') || (yes(g('Depicts a real person (face or voice)?', 'depicts_real_person')) ? 'a real person (face or voice)' : 'nothing real')).toLowerCase();\nconst realPerson = /person|face|voice/.test(shows);\nconst realThing = /object|place|event|entity/.test(shows);\nconst manipulated = /manipulat/.test(String(g('Generated or manipulated?', 'origin') || 'generated').toLowerCase());\nconst artistic = yes(g('Artistic, creative or satirical work?', 'artistic'));\nconst publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };\nconst rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';\nconst ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');\nconst shellSafe = (v) => String(v ?? '').replace(/[^\\p{L}\\p{N} .,;:()\\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => manipulated ? `This ${type} was altered with an AI system (${m}).` : `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [], other_law = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson || realThing) {\n    // Art. 3(60): content resembling existing persons, objects, places, entities or events that would falsely appear authentic\n    category = 'deepfake'; label_required = true; label_basis = artistic ? 'law (limited: artistic work)' : 'law';\n    obligations.push('Art. 3(60) deep fake: ' + (manipulated ? 'manipulated' : 'generated') + ' content resembling ' + (realPerson ? 'a real person' : 'a real object, place or event') + ' that would appear authentic.');\n    obligations.push('Art. 50(4) §1 — disclose that the content is artificially ' + (manipulated ? 'manipulated' : 'generated') + '.' + (artistic ? ' Artistic, creative or satirical work: the disclosure may be limited so it does not hamper the work — still present, in an appropriate form.' : ''));\n    if (realPerson) other_law.push('Consent or another legal basis for using the person\\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' · EU AI Act Art. 50';\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst font = '/usr/share/fonts/DejaVuSans.ttf';\nconst draw = artistic\n  ? `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white@0.85:fontsize=h/48:box=1:boxcolor=black@0.35:boxborderw=6:x=w-tw-14:y=h-th-14`\n  : `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;\nconst meta = `-metadata comment=\"${label_text}; manifest ${id}\" -metadata title=\"${shellSafe(disclosure_sentence)}\"`;\nlet ffmpeg_cmd = '';\nif (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" ${meta} \"${outPath}\"`;\nelse if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" -c:a copy ${meta} \"${outPath}\"`;\nelse if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -c copy ${meta} \"${outPath}\"`;\n\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations, other_law,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];"
+        "jsCode": "// Article 50 classification for a deployer. One item in, one item out.\n// Accepts the form's field labels or snake_case fields from a calling workflow.\nconst it = $input.first();\nconst f = it.json || {};\nconst g = (label, key) => (f[label] !== undefined && f[label] !== '' ? f[label] : f[key]);\nconst now = new Date();\nconst id = now.toISOString().slice(0,23).replace(/[:T.]/g,'-') + '-' + String(f.prompt_sha256 || '').slice(0,6) + Math.random().toString(36).slice(2,6);\nconst type = String(g('Asset type', 'asset_type') || '').toLowerCase();\nconst yes = (v) => ['yes', 'true', '1'].includes(String(v ?? 'no').toLowerCase());\nconst shows = String(g('What does it show?', 'shows') || (yes(g('Depicts a real person (face or voice)?', 'depicts_real_person')) ? 'a real person (face or voice)' : 'nothing real')).toLowerCase();\nconst realPerson = /person|face|voice/.test(shows);\nconst realThing = /object|place|event|entity/.test(shows);\nconst manipulated = /manipulat/.test(String(g('Generated or manipulated?', 'origin') || 'generated').toLowerCase());\nconst artistic = yes(g('Artistic, creative or satirical work?', 'artistic'));\nconst publicInfo = yes(g('Published to inform the public on a matter of public interest?', 'public_information') ?? g('Published to inform the public?', 'public_information'));\nconst lang = String(g('Language of the asset', 'language') || 'en').slice(0, 2).toLowerCase();\nconst model = String(g('Model', 'model') || '');\nconst binary_key = it.binary && it.binary.File ? 'File' : (it.binary && it.binary.data ? 'data' : null);\nconst file = binary_key ? it.binary[binary_key] : null;\nconst ALLOWED = { image: ['png','jpg','jpeg','webp'], video: ['mp4','mov','webm'], audio: ['wav','mp3','m4a','ogg'] };\nconst rawExt = file && file.fileName && file.fileName.includes('.') ? file.fileName.split('.').pop().toLowerCase() : '';\nconst ext = (ALLOWED[type] || []).includes(rawExt) ? '.' + rawExt : ((ALLOWED[type] || [''])[0] ? '.' + ALLOWED[type][0] : '');\nconst shellSafe = (v) => String(v ?? '').replace(/[^\\p{L}\\p{N} .,;:()\\-_/§·]/gu, '').slice(0, 160);   // nothing from a user reaches the shell unfiltered\n\n// Approved disclosure wording per language. Legal text is fixed, not generated: change it here, with counsel, not per asset.\nconst DISCLOSURE = {\n  en: (m) => manipulated ? `This ${type} was altered with an AI system (${m}).` : `This ${type} was created with an AI system (${m}).`,\n  bg: (m) => `Този ${({text:'текст',image:'образ',video:'видеоклип',audio:'аудиозапис'})[type] || 'материал'} е създаден с помощта на изкуствен интелект (${m}).`,\n  ru: (m) => `${({text:'Этот текст создан',image:'Это изображение создано',video:'Это видео создано',audio:'Эта аудиозапись создана'})[type] || 'Этот материал создан'} с помощью системы искусственного интеллекта (${m}).`,\n  de: (m) => `${({text:'Dieser Text wurde',image:'Dieses Bild wurde',video:'Dieses Video wurde',audio:'Diese Aufnahme wurde'})[type] || 'Dieses Material wurde'} mit einem KI-System erstellt (${m}).`,\n};\nconst disclosure_sentence = (DISCLOSURE[lang] || DISCLOSURE.en)(model || 'AI system');\n\nlet category, label_required = false, label_basis = 'none';\nconst obligations = [], other_law = [];\nif (type === 'text') {\n  if (publicInfo) {\n    category = 'generated_public_text'; label_required = true; label_basis = 'law';\n    obligations.push('Art. 50(4) §2 — text published to inform the public on matters of public interest must be disclosed as AI-generated, unless a human exercised editorial control and a person holds editorial responsibility.');\n  } else {\n    category = 'internal_text';\n    obligations.push('No Art. 50 duty: not published to inform the public. Provenance is recorded anyway.');\n  }\n} else {\n  if (realPerson || realThing) {\n    // Art. 3(60): content resembling existing persons, objects, places, entities or events that would falsely appear authentic\n    category = 'deepfake'; label_required = true; label_basis = artistic ? 'law (limited: artistic work)' : 'law';\n    obligations.push('Art. 3(60) deep fake: ' + (manipulated ? 'manipulated' : 'generated') + ' content resembling ' + (realPerson ? 'a real person' : 'a real object, place or event') + ' that would appear authentic.');\n    obligations.push('Art. 50(4) §1 — disclose that the content is artificially ' + (manipulated ? 'manipulated' : 'generated') + '.' + (artistic ? ' Artistic, creative or satirical work: the disclosure may be limited so it does not hamper the work — still present, in an appropriate form.' : ''));\n    if (realPerson) other_law.push('Consent or another legal basis for using the person\\'s likeness or voice: GDPR and personality rights, not the AI Act (consent reference below).');\n  } else {\n    category = 'synthetic_media';\n    label_required = (type === 'image' || type === 'video' || (type === 'audio' && publicInfo));\n    label_basis = label_required ? 'house policy' : 'none';\n    obligations.push('Art. 50(2) machine-readable marking is the provider\\'s duty; as deployer we keep a provenance manifest and apply a disclosure by house policy.');\n  }\n}\n\nconst label_text = (manipulated ? 'AI-manipulated' : 'AI-generated') + ' - EU AI Act Art. 50';   // ASCII only: drawtext in this ffmpeg build drops the last glyph after a multibyte character\nconst inPath  = `/data/incoming/${id}${ext}`;\nconst outPath = `/data/labelled/${id}${ext}`;\nconst font = '/usr/share/fonts/DejaVuSans.ttf';\nconst draw = artistic\n  ? `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white@0.85:fontsize=h/48:box=1:boxcolor=black@0.35:boxborderw=6:x=w-tw-14:y=h-th-14`\n  : `drawtext=fontfile=${font}:text='${label_text}':fontcolor=white:fontsize=h/28:box=1:boxcolor=black@0.55:boxborderw=10:x=20:y=h-th-20`;\nconst meta = `-metadata comment=\"${label_text}; manifest ${id}\" -metadata title=\"${shellSafe(disclosure_sentence)}\"`;\nlet ffmpeg_cmd = '';\nif (type === 'image')      ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" ${meta} \"${outPath}\"`;\nelse if (type === 'video') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -vf \"${draw}\" -c:a copy ${meta} \"${outPath}\"`;\nelse if (type === 'audio') ffmpeg_cmd = `ffmpeg -y -loglevel error -i \"${inPath}\" -c copy ${meta} \"${outPath}\"`;\n\nconst manifest = {\n  id, created_at: now.toISOString(),\n  line: String(g('Calling workflow', 'caller_workflow') || 'manual intake'),\n  asset_type: type, category, label_required, label_basis, label_text: label_required ? label_text : null,\n  obligations, other_law,\n  model, model_version: String(g('Model version', 'model_version') || ''),\n  prompt_sha256: f.prompt_sha256 || '',\n  operator: String(g('Operator', 'operator') || ''),\n  depicts_real_person: realPerson, shows, manipulated, artistic, consent_reference: String(g('Consent reference', 'consent_reference') || ''),\n  public_information: publicInfo,\n  source_file: file ? file.fileName : null,\n  incoming_path: file ? inPath : null, labelled_path: (file && ffmpeg_cmd) ? outPath : null,\n  text_content: type === 'text' ? String(g('Text content', 'text_content') || '') : null,\n  language: lang, disclosure_sentence,\n  status: 'pending_review',\n};\nreturn [{ json: { ...manifest, ext, ffmpeg_cmd, binary_key }, binary: it.binary }];"
       }
     },
     {
-      "id": "16e2aef4-59f7-4a17-80af-21a4be73d90a",
+      "id": "684eccb6-1ebf-43a0-8526-f099c16054ab",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -223,7 +223,7 @@
           },
           "conditions": [
             {
-              "id": "90fcc8a8-8217-4930-bbf5-df96b2352e9b",
+              "id": "74869692-4a2c-4854-9403-cea31da63f66",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -238,7 +238,7 @@
       }
     },
     {
-      "id": "7b5bf655-2592-469f-b79e-258823919d47",
+      "id": "78d3bbfc-7442-4dca-a5e8-404a8d38c3de",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -251,7 +251,7 @@
       }
     },
     {
-      "id": "c0ea2cb5-15a5-4c47-abfb-a67f0eeb5914",
+      "id": "eb652366-820e-4d1e-85d7-78b7d2cbf9df",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -267,7 +267,7 @@
       }
     },
     {
-      "id": "6df7af10-29c2-43dd-aa04-048d09df725e",
+      "id": "1e96fbf2-b3ef-4ab3-a4a0-5488ca678d51",
       "name": "Label with ffmpeg",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -280,7 +280,7 @@
       }
     },
     {
-      "id": "48f4f0f4-85bf-4794-b663-b07a7822e12c",
+      "id": "99c9d237-2c7a-4236-ae55-28c7f4d96f23",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -293,7 +293,7 @@
       }
     },
     {
-      "id": "93bb38be-8d25-40d8-8699-85ee64a6cb17",
+      "id": "f3e09ea6-8a04-4c72-abed-db139e25955f",
       "name": "Store asset",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -316,7 +316,7 @@
       }
     },
     {
-      "id": "0e2f52df-e4cf-428a-99a4-9fefe3f46f3b",
+      "id": "43cc8c51-8bc6-4b42-a210-c8d5846983c5",
       "name": "Notify reviewer (Slack)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
@@ -341,7 +341,7 @@
       "notes": "Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
     },
     {
-      "id": "83ef6082-a25e-43eb-abd6-84596dea3743",
+      "id": "8f1fc6f7-e9c2-40f2-be4c-2b93c555930b",
       "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -394,7 +394,7 @@
       "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "ad8e89ba-4ccb-4cdf-8584-54cf86893bbb",
+      "id": "eaf94d2b-c82d-4fb4-930f-e852a125542c",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -407,7 +407,7 @@
       }
     },
     {
-      "id": "940c6e14-cf4a-4f85-9894-777e8f45ea83",
+      "id": "86328bec-0080-4d0b-8940-20674476e142",
       "name": "Record decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -430,7 +430,7 @@
       }
     },
     {
-      "id": "44238c51-21f1-4672-8bc8-8dab8309fed7",
+      "id": "91696db8-5534-40d3-90e8-1df9b3777a2f",
       "name": "Read assets",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -453,7 +453,7 @@
       }
     },
     {
-      "id": "fee0125e-90dd-4b41-a778-fb6a87c30604",
+      "id": "f14ac7ea-7dea-4edf-b1ab-50675f827c7b",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
@@ -477,7 +477,7 @@
       }
     },
     {
-      "id": "c28c7f18-617b-4076-839a-8fd2def29a68",
+      "id": "93cfeb40-bcd7-4240-a5e2-75ae4791abfd",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -490,7 +490,7 @@
       }
     },
     {
-      "id": "bb23b67e-0136-44fd-94b8-6e06fada6cfc",
+      "id": "e2cbaa7e-e6b0-444e-bead-be9575c3016f",
       "name": "Snapshot registry",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -513,7 +513,7 @@
       }
     },
     {
-      "id": "18d09d71-805f-412d-bbb8-acec2ac7c835",
+      "id": "cf0618af-6363-4b47-9f44-50d1b6a6a97e",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -526,7 +526,7 @@
       }
     },
     {
-      "id": "ade88a70-dc73-4856-9527-6d820903cc52",
+      "id": "e49321ad-4af6-463b-8c06-563e0957b345",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
