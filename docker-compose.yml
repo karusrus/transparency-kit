@@ -1,0 +1,70 @@
+# AI Act Transparency Kit — one command: `docker compose up -d`, then open http://localhost:5678 and create the owner.
+# Postgres ledger, the ffmpeg label service, stock n8n. The `init` job imports and publishes the workflows before n8n starts.
+# Optional: put GATE_MODE=slack and a stronger KIT_DB_PASSWORD in .env (see README).
+services:
+  kit-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kit
+      POSTGRES_USER: kit
+      POSTGRES_PASSWORD: ${KIT_DB_PASSWORD:-kit}
+    volumes:
+      - kit_db:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kit -d kit"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  kit-media-label:                          # the kit calls http://kit-media-label:8881/label
+    build: ./tools/media-label
+    restart: unless-stopped
+
+  init:
+    image: n8nio/n8n:latest
+    depends_on:
+      kit-db:
+        condition: service_healthy
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+    environment:
+      KIT_DB_PASSWORD: ${KIT_DB_PASSWORD:-kit}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        printf '[{"id":"KitPostgresCred01","name":"kit-db","type":"postgres","data":{"host":"kit-db","database":"kit","user":"kit","password":"%s","port":5432,"ssl":"disable","allowUnauthorizedCerts":false}}]' "$$KIT_DB_PASSWORD" > /tmp/cred.json
+        n8n import:credentials --input=/tmp/cred.json
+        for f in transparency-kit audit-view sample-line sample-50-3 sample-chatbot host-line; do n8n import:workflow --input=/workflows/$$f.json; done
+        for id in AiActTransparenc AiActAuditView00 RecyclingVoices1; do n8n publish:workflow --id=$$id; done
+        echo "kit imported"
+
+  n8n:
+    image: n8nio/n8n:latest
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      kit-media-label:
+        condition: service_started
+    ports:
+      - "5678:5678"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # the demo line reaches a local TTS on the host
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./data:/data
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_RESTRICT_FILE_ACCESS_TO: /data
+      GENERIC_TIMEZONE: ${TZ:-Europe/Sofia}
+      TZ: ${TZ:-Europe/Sofia}
+    restart: unless-stopped
+
+volumes:
+  kit_db:
+  n8n_data:

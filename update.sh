@@ -13,3 +13,5 @@ for id in AiActTransparenc AiActAuditView00 RecyclingVoices1; do docker exec n8n
 docker restart n8n >/dev/null
 sleep 22
 for u in form/ai-act-intake form/notice webhook/audit; do printf '%s ' "$u"; curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:5678/$u"; done
+# leave the committed JSON in the default form mode so a fresh install needs no credentials
+GATE_MODE=form python3 workflows/build.py >/dev/null

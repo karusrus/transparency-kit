@@ -96,6 +96,10 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
     <figure><img src="labelled-satire.jpg" alt="The same alteration as a satirical work with a limited corner label"><figcaption>The same alteration declared as satire: disclosure limited to a small corner label, as Art. 50(4) allows for artistic work, still present.</figcaption></figure>
     <figure><img src="labelled-person.jpg" alt="A real person, generated portrait, full label"><figcaption>A real person: my own likeness, consent is my own signature. Full label, consent reference in the manifest; the consent itself is GDPR and personality rights, not the AI Act, and the kit keeps them apart.</figcaption></figure>
   </div>
+  <div class="card" style="padding:16px 18px;margin:0 0 18px">
+    <p class="kicker">Why the satire label is smaller</p>
+    <p style="margin:0;color:var(--mut)">Art. 50(4) §1, last sentence: when a deep fake is part of an <em>evidently artistic, creative, satirical, fictional or analogous work</em>, the duty is limited to disclosing "in an appropriate manner that does not hamper the display or enjoyment of the work". The law keeps the label and lets it shrink. In the demo the same altered photo of Varna goes through the gate twice with one intake answer changed, <em>Artistic, creative or satirical work?</em>: <b>no</b> gives the full "AI-manipulated" label and the disclosure sentence under the photo, <b>yes</b> gives a small corner label. The claim is the operator's, not the kit's: the person at the gate sees it and approves or returns.</p>
+  </div>
   <p class="sub">Systems, not assets: emotion recognition and biometric categorisation must inform the people exposed (Art. 50(3)), chatbots must say they are AI (Art. 50(1)). The registry flags both from the workflow graph, publishing or not.</p>
 </section>
 
@@ -119,11 +123,11 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
   <h2>Install it: ten minutes, one machine</h2>
   <p class="sub">Docker and Python 3. No model, no GPU, no API key: the kit labels and records what your generators produce, it does not generate. Works with any model your line already calls, because the line only passes the model's name and the prompt.</p>
   <ol class="steps">
-    <li><b>Clone and start.</b> <code>git clone https://github.com/karusrus/transparency-kit && cd transparency-kit && ./reload.sh</code> — Postgres, the label service and stock n8n come up on one Docker network; the six workflows are imported and published.</li>
+    <li><b>Clone and start, one of two ways.</b> <code>git clone https://github.com/karusrus/transparency-kit && cd transparency-kit</code>, then either <code>docker compose up -d</code> (an init job imports and publishes the six workflows before n8n starts) or <code>./reload.sh</code> (the same three containers with plain <code>docker run</code>, needs Python 3).</li>
     <li><b>Create the n8n owner</b> at <code>localhost:5678</code>, once.</li>
     <li><b>Send an asset</b> through <code>/form/ai-act-intake</code>; decide at the form gate; read <code>/webhook/audit</code>.</li>
     <li><b>Optional, registry:</b> an n8n API key attached to the node <i>Read all workflows</i>, so the page lists every AI system on the instance.</li>
-    <li><b>Optional, Slack gate:</b> a Slack app with five scopes, one credential, <code>GATE_MODE=slack</code> in <code>.env</code>, <code>./update.sh</code>.</li>
+    <li><b>Optional, Slack gate:</b> a Slack app with five scopes, one credential, <code>GATE_MODE=slack</code> in <code>.env</code>, rebuild and re-import.</li>
   </ol>
   <p class="sub">After that, embedding in your own line is three nodes, below.</p>
 </section>
@@ -144,7 +148,7 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
 </section>
 
 <footer>
-  <p><b>Ruslan Karymov</b> · AI &amp; Automation Lead · Creative, marketing and business operations · <a href="https://karusrus.github.io">karusrus.github.io</a> · <a href="https://github.com/karusrus/transparency-kit">transparency-kit</a> · <a href="https://github.com/karusrus/pipeline-map">pipeline-map</a></p>
+  <p><b>Ruslan Karymov</b> · AI Enablement &amp; Automation Lead · Creative, marketing and business operations · <a href="https://karusrus.github.io">karusrus.github.io</a> · <a href="https://github.com/karusrus/transparency-kit">transparency-kit</a> · <a href="https://github.com/karusrus/pipeline-map">pipeline-map</a></p>
 </footer>
 </div>
 </body>

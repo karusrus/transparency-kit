@@ -90,14 +90,27 @@ Scope is deliberate: deployer duties under Article 50 (in force 2 August 2026) a
 
 ## Quick start (ten minutes, one machine)
 
-Needs Docker and Python 3. No model, no GPU, no API key: the kit labels and records what *your* generators produce.
+Needs Docker. No model, no GPU, no API key: the kit labels and records what *your* generators produce.
+
+**Option A · Docker Compose, one command**
 
 ```bash
 git clone https://github.com/karusrus/transparency-kit && cd transparency-kit
-./reload.sh                                   # Postgres + label service + stock n8n on one Docker network; imports and publishes all workflows
+docker compose up -d                          # Postgres + label service + stock n8n; the init job imports and publishes the six workflows before n8n starts
 open http://localhost:5678                    # create the n8n owner account (once)
 open http://localhost:5678/form/ai-act-intake # send the first asset through the gate
 open http://localhost:5678/webhook/audit      # the auditor's page, filled from the ledger
+```
+
+`docker compose down -v` removes everything. Set `KIT_DB_PASSWORD` in `.env` for anything beyond a laptop demo.
+
+**Option B · the scripts (needs Python 3; what this repository was built with)**
+
+```bash
+git clone https://github.com/karusrus/transparency-kit && cd transparency-kit
+./reload.sh        # same three containers with plain docker run; generates the DB password into .env, imports and publishes
+./update.sh        # after editing workflows/build.py: rebuild, re-import, publish; keeps owner, API key, credentials and the ledger
+./demo.sh          # seven assets and seven decisions through the intake form, for numbers on the audit view
 ```
 
 That is the whole install for the default **form gate**: every asset waits at a form, the link sits on the audit view. Two optional steps unlock the rest:
@@ -105,12 +118,12 @@ That is the whole install for the default **form gate**: every asset waits at a 
 | Optional | Why | How |
 |---|---|---|
 | **AI-systems registry** | reads every workflow on the instance | *Settings → n8n API* → create a key (scope `workflow:list`), add an *n8n API* credential (base URL `http://localhost:5678/api/v1`), attach it to the node **Read all workflows**, publish |
-| **Slack gate** | reviewers answer in a thread, identity from Slack | a Slack app with `chat:write`, `channels:read`, `channels:history`, `users:read`, `files:write`; a *Slack API* credential in n8n; `GATE_MODE=slack` in `.env`, then `./update.sh` |
+| **Slack gate** | reviewers answer in a thread, identity from Slack | a Slack app with `chat:write`, `channels:read`, `channels:history`, `users:read`, `files:write`; a *Slack API* credential in n8n; `GATE_MODE=slack` in `.env`, then `./update.sh` (Option B; with Compose: `GATE_MODE=slack python3 workflows/build.py && docker compose run --rm init && docker compose restart n8n`) |
 | **Demo line with voices** | the three-voices example needs a local TTS | `python tools/kokoro_server.py --port 8880` (kokoro-onnx, CPU) |
 
 Which models does it work with? Any. The line passes the generator's name (`model`, `model_version`) and the prompt; the kit hashes the prompt, fixes the disclosure sentence and never calls a model itself. The only model in this repository is the demo voice.
 
-`reload.sh` deletes both volumes: the n8n owner account, API key and credentials, and the ledger. Use `update.sh` for everything after the first run (it re-imports the workflows and keeps everything else). The database password is generated into `.env` and `secrets/postgres-credential.json` on first run (both git-ignored); the credential id `KitPostgresCred01` is fixed so the imported workflows bind to it.
+`reload.sh` (Option B) deletes both volumes: the n8n owner account, API key and credentials, and the ledger. Use `update.sh` for everything after the first run (it re-imports the workflows and keeps everything else). The database password is generated into `.env` and `secrets/postgres-credential.json` on first run (both git-ignored); the credential id `KitPostgresCred01` is fixed so the imported workflows bind to it.
 
 Environment the kit needs (already in `reload.sh`):
 

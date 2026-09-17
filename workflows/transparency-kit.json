@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "18f84f1b-d999-4917-ac79-bd1c3f0352fc",
+      "id": "43786b14-dde9-4887-b76a-2da3f8024cc2",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -163,7 +163,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "33bd5df2-9d16-4867-9bc4-a4aa7273b5ce",
+      "id": "e73223c1-b7f9-40b7-923f-4bca3e4163ba",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -176,7 +176,7 @@
       }
     },
     {
-      "id": "b2c77513-a766-4ed8-aa6f-467b6cb70814",
+      "id": "81cef236-e034-44ac-8c35-3660c692a075",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -192,7 +192,7 @@
       }
     },
     {
-      "id": "b4607025-3788-41b9-9a8c-1316d0fdc3e2",
+      "id": "61951344-b20a-46bc-9aa1-d117957cd7b3",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -205,7 +205,7 @@
       }
     },
     {
-      "id": "62c42f88-8079-41fd-a137-99c204bdd977",
+      "id": "2b1fed6b-a156-4348-90f3-b5bcb1edfb78",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -223,7 +223,7 @@
           },
           "conditions": [
             {
-              "id": "15e68d45-4025-4ec6-9404-63113f0b7dfc",
+              "id": "b8d8677d-9e95-4683-bbc6-92e70ebe0cb3",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -238,7 +238,7 @@
       }
     },
     {
-      "id": "015d0e72-46bc-429e-8c08-860534d41f56",
+      "id": "1bfc1f19-05fc-49db-9c10-4d6de5c22742",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -251,7 +251,7 @@
       }
     },
     {
-      "id": "cdab5944-566a-43b0-b33b-e1ca7e59eade",
+      "id": "6d3b0984-001e-4f29-88a4-e41591eb0811",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -267,7 +267,7 @@
       }
     },
     {
-      "id": "20c52cc8-b940-47cb-9988-a33f1a9fed56",
+      "id": "ca4742f3-a4c5-4430-bef7-7248f74e9a85",
       "name": "Image?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -285,7 +285,7 @@
           },
           "conditions": [
             {
-              "id": "30c6f289-64e6-42c4-b5e1-e1423c32ca13",
+              "id": "e3105fc8-573a-4bcf-bdfa-a4221cdec230",
               "leftValue": "={{ $('Classify (Art. 50)').first().json.asset_type }}",
               "rightValue": "image",
               "operator": {
@@ -300,7 +300,7 @@
       }
     },
     {
-      "id": "943aec51-8d5e-4880-85c9-c6ddf5c864ca",
+      "id": "fca58f9c-3c17-46f5-9c2b-655f498b5734",
       "name": "Label image (Edit Image)",
       "type": "n8n-nodes-base.editImage",
       "typeVersion": 1.1,
@@ -322,7 +322,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "b0ace56d-0f6e-4b82-934b-e7e544d4c852",
+      "id": "3850808c-c0aa-40b9-b81b-60ed5aa5cb68",
       "name": "Label media (service)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -349,7 +349,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "a60f42fe-d467-463e-9bef-f48430bf7000",
+      "id": "d038a83e-9720-46d8-925a-3a676c83e4bd",
       "name": "Write labelled file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -365,7 +365,7 @@
       }
     },
     {
-      "id": "2e3baefe-a2b6-44a1-9322-392fc33adf0e",
+      "id": "ed822c68-0e0b-4e5c-b7ed-568a7d0267aa",
       "name": "Burned in",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -377,7 +377,7 @@
         "assignments": {
           "assignments": [
             {
-              "id": "07179b9b-9147-4a29-9aef-1ab2c1e4feea",
+              "id": "d7394eea-9cea-4468-b783-60ed39beb404",
               "name": "burned_in",
               "value": true,
               "type": "boolean"
@@ -388,7 +388,7 @@
       }
     },
     {
-      "id": "c977aec3-25b7-4539-b1fa-7fce7554acb4",
+      "id": "1a4b00a8-f700-4298-9359-d9db152f0bc0",
       "name": "No burn-in",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -400,13 +400,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "cc6fd191-7e30-48ac-b10e-ea0e39665d29",
+              "id": "3555facd-e6bb-4f6a-b391-e096be9bb3f5",
               "name": "burned_in",
               "value": false,
               "type": "boolean"
             },
             {
-              "id": "4dfa4623-65c8-46e0-8ae8-ef381f07a513",
+              "id": "1f300e2c-9579-49b5-a7bf-33560ac62d75",
               "name": "label_note",
               "value": "={{ 'No burnt-in label: ' + ($('Classify (Art. 50)').first().json.asset_type === 'audio' ? 'audio carries the disclosure in metadata and at publication' : 'the media-label service was not reachable; disclosure goes with the file at publication') }}",
               "type": "string"
@@ -417,7 +417,7 @@
       }
     },
     {
-      "id": "d3927d6a-c137-4d64-9968-100c8ece3ecc",
+      "id": "607500fb-c0c2-4a3b-9d87-93407a7c489b",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -430,7 +430,7 @@
       }
     },
     {
-      "id": "5b6a8a55-b2c4-44a3-b326-cd785da015d1",
+      "id": "ae10de7a-80c9-4bfb-b1fe-9446ffb88c13",
       "name": "Store asset",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -453,13 +453,13 @@
       }
     },
     {
-      "id": "f5b619e1-7a50-410a-8adf-78e5b86cc79d",
-      "name": "Post to the review thread",
+      "id": "79296c96-5c0f-41c5-91ca-d98c328f2d58",
+      "name": "Notify reviewer (Slack)",
       "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
+      "typeVersion": 2.3,
       "position": [
-        2160,
-        300
+        2640,
+        160
       ],
       "parameters": {
         "resource": "message",
@@ -470,229 +470,68 @@
           "mode": "name",
           "value": "#ai-act-gate"
         },
-        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\n' + ($('Build manifest').first().json.prompt ? 'Prompt: _' + String($('Build manifest').first().json.prompt).slice(0, 300) + '_\\n' : '') + ($('Build manifest').first().json.shows ? 'Shows: ' + $('Build manifest').first().json.shows + ($('Build manifest').first().json.consent_reference ? ' · consent ' + $('Build manifest').first().json.consent_reference : '') + '\\n' : '') + ($('Build manifest').first().json.disclosed_text ? '>' + String($('Build manifest').first().json.disclosed_text).slice(0, 900).replace(/\\n/g, '\\n>') + '\\n' : ($('Build manifest').first().json.labelled_path ? 'File: ' + $('Build manifest').first().json.labelled_path + ' (attached below)\\n' : '')) + 'Reply in this thread: *approve* · *editorial* (text only, you take editorial responsibility) · *return <reason>*' }}",
+        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nDecide here: ' + $('Build manifest').first().json.gate_url }}",
         "otherOptions": {}
       },
-      "credentials": {
-        "slackApi": {
-          "id": "yqaUQ2SkfGomOHLf",
-          "name": "Slack_pipeline_approval"
-        }
-      }
-    },
-    {
-      "id": "e1ea9239-2d42-4353-baf0-3877f5a549c6",
-      "name": "Has a file?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        2160,
-        460
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "3d8f72d8-d154-48ce-a54d-fb45798a114f",
-              "leftValue": "={{ $('Build manifest').first().json.labelled_path || '' }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "41c03e11-125a-4b1a-985c-7cf01d57d8ac",
-      "name": "Read labelled file",
-      "type": "n8n-nodes-base.readWriteFile",
-      "typeVersion": 1,
-      "position": [
-        2400,
-        460
-      ],
-      "parameters": {
-        "operation": "read",
-        "fileSelector": "={{ $('Build manifest').first().json.labelled_path }}",
-        "options": {
-          "dataPropertyName": "data"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "b4820437-1cba-468c-831d-9a569754eaf9",
-      "name": "Attach to the thread",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        2640,
-        460
-      ],
-      "parameters": {
-        "resource": "file",
-        "operation": "upload",
-        "binaryPropertyName": "data",
-        "options": {
-          "channelId": "={{ $('Post to the review thread').first().json.channel }}",
-          "threadTs": "={{ $('Post to the review thread').first().json.ts || $('Post to the review thread').first().json.message.ts }}",
-          "fileName": "={{ String($('Build manifest').first().json.labelled_path).split('/').pop() }}",
-          "title": "={{ $('Build manifest').first().json.label_text || 'labelled asset' }}"
-        }
-      },
       "onError": "continueRegularOutput",
-      "credentials": {
-        "slackApi": {
-          "id": "yqaUQ2SkfGomOHLf",
-          "name": "Slack_pipeline_approval"
-        }
-      },
-      "notes": "Needs the files:write scope on the Slack app. Without it the upload is skipped and the thread still carries the file path."
+      "disabled": true,
+      "notes": "Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
     },
     {
-      "id": "12d58254-956b-4949-a68b-65f9f90b389b",
-      "name": "Wait for the thread",
+      "id": "4b63d7dd-b3b3-41f5-ae43-783e76413fcc",
+      "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [
-        2400,
-        300
-      ],
-      "parameters": {
-        "resume": "timeInterval",
-        "amount": 20,
-        "unit": "seconds"
-      },
-      "webhookId": "a1b2c3d4-0005-4000-8000-aiactpoll0001"
-    },
-    {
-      "id": "ed2fa409-c7d9-478f-8922-297c762a60b0",
-      "name": "Read the thread",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        2640,
-        300
-      ],
-      "parameters": {
-        "resource": "channel",
-        "operation": "replies",
-        "channelId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $('Post to the review thread').first().json.channel }}"
-        },
-        "ts": "={{ $('Post to the review thread').first().json.ts || $('Post to the review thread').first().json.message.ts }}",
-        "returnAll": true,
-        "filters": {}
-      },
-      "credentials": {
-        "slackApi": {
-          "id": "yqaUQ2SkfGomOHLf",
-          "name": "Slack_pipeline_approval"
-        }
-      }
-    },
-    {
-      "id": "d28abc2b-1e1a-45d5-9bee-637f8191bf72",
-      "name": "Decided in the thread?",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
       "position": [
         2880,
         300
       ],
       "parameters": {
-        "jsCode": "// Look through the thread replies for the first decision by a channel member. Returns decided=false to keep polling.\nconst root = $('Post to the review thread').first().json;\nconst rootTs = root.ts || (root.message && root.message.ts);\nconst replies = $input.all().map(i => i.json).filter(m => m.ts !== rootTs && !m.bot_id && m.user);\nlet decided = false, decision = '', reason = '', user = '', ts = '';\nfor (const m of replies) {\n  const t = String(m.text || '').trim(); const low = t.toLowerCase();\n  if (/^(:white_check_mark:|✅|approve)/.test(low)) { decided = true; decision = 'Approve — publish with the disclosure'; }\n  else if (/^(:writing_hand:|✍️|editorial)/.test(low)) { decided = true; decision = 'Editorial exception — I edited this text and take editorial responsibility (text only)'; }\n  else if (/^(:x:|❌|return|reject)/.test(low)) { decided = true; decision = 'Return — needs changes'; }\n  if (decided) { reason = t.replace(/^(:[a-z_]+:|✅|✍️|❌|approve|editorial|return|reject)\\s*[:\\-–—]?\\s*/i, '').trim(); user = m.user; ts = m.ts; break; }\n}\nconst polls = $runIndex + 1;\nif (!decided && polls >= 4320) { decided = true; decision = 'Return — needs changes'; reason = 'No decision in the thread within the wait limit; returned automatically.'; user = ''; }\nreturn [{ json: { decided, Decision: decision, 'Reason / note': reason, slack_user: user, slack_ts: ts, polls } }];"
-      }
-    },
-    {
-      "id": "c6b4a36b-8780-43ac-b5a4-cba1c8ef9529",
-      "name": "Decision found?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        3120,
-        300
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
+        "resume": "form",
+        "formTitle": "Human approval gate",
+        "formDescription": "One asset, one decision. Everything below was filled by the line.",
+        "formFields": {
+          "values": [
             {
-              "id": "39a3ec9c-148b-481f-9052-1da0efe01cac",
-              "leftValue": "={{ $json.decided }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
+              "fieldLabel": "Context",
+              "fieldType": "html",
+              "elementName": "context",
+              "html": "={{ (() => { const m = $('Build manifest').first().json; const esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); return '<div style=\"font:14px/1.5 -apple-system,Inter,sans-serif;color:#14171c\">' + '<h3 style=\"margin:0 0 6px\">Human approval gate</h3>' + '<p style=\"margin:0 0 8px;color:#6b7280\">Line: ' + esc(m.line) + ' · asset <code>' + esc(m.id) + '</code> · ' + esc(m.asset_type) + ' · <b>' + esc(m.category) + '</b> · model ' + esc(m.model) + (m.model_version ? ' ' + esc(m.model_version) : '') + ' · operator ' + esc(m.operator) + '</p>' + '<p style=\"margin:0 0 8px\"><b>Disclosure sentence</b> (' + esc(m.language) + '): ' + esc(m.disclosure_sentence) + '</p>' + '<p style=\"margin:0 0 4px\"><b>Obligations under the AI Act</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.obligations.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' + ((m.other_law || []).length ? '<p style=\"margin:0 0 4px\"><b>Other law</b></p><ul style=\"margin:0 0 8px 18px;padding:0\">' + m.other_law.map(o => '<li>' + esc(o) + '</li>').join('') + '</ul>' : '') + '<p style=\"margin:0 0 8px\">Shows: ' + esc(m.shows) + ' · ' + (m.manipulated ? 'manipulated' : 'generated') + (m.artistic ? ' · artistic/satirical work' : '') + '</p>' + (m.depicts_real_person ? '<p style=\"margin:0 0 8px\">Real person depicted · consent: <code>' + esc(m.consent_reference || 'MISSING') + '</code></p>' : '') + (m.labelled_path ? '<p style=\"margin:0 0 8px\">File: <code>' + esc(m.labelled_path) + '</code> · ' + (m.burned_in ? 'label burnt in' : esc(m.label_note || 'no burnt-in label')) + '</p>' : '') + (m.disclosed_text ? '<p style=\"margin:0 0 4px\"><b>Text as it would be published</b></p><pre style=\"white-space:pre-wrap;background:#f6f7f9;padding:10px;border-radius:8px;margin:0\">' + esc(m.disclosed_text) + '</pre>' : '') + '</div>'; })() }}"
+            },
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Approve — publish with the disclosure"
+                  },
+                  {
+                    "option": "Editorial exception — I edited this text and take editorial responsibility (text only)"
+                  },
+                  {
+                    "option": "Return — needs changes"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reviewer",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reason / note",
+              "fieldType": "textarea"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
-      }
-    },
-    {
-      "id": "86d743b5-5f48-4750-94f3-6454ad2a95c5",
-      "name": "Who answered",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.7,
-      "position": [
-        3360,
-        300
-      ],
-      "parameters": {
-        "resource": "user",
-        "operation": "info",
-        "user": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $json.slack_user }}"
-        }
       },
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "slackApi": {
-          "id": "yqaUQ2SkfGomOHLf",
-          "name": "Slack_pipeline_approval"
-        }
-      }
+      "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "2debf24c-0a0f-43c9-b30b-318d888a96de",
-      "name": "Review & approve",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3600,
-        300
-      ],
-      "parameters": {
-        "jsCode": "// The reviewer's identity comes from Slack, not from a text field.\nconst d = $('Decided in the thread?').first().json;\nconst u = $input.first().json || {};\nconst name = (u.real_name || (u.profile && u.profile.real_name) || u.name || '').trim();\nconst reviewer = name ? `${name} (Slack ${d.slack_user})` : (d.slack_user ? `Slack ${d.slack_user}` : 'gate timeout');\nreturn [{ json: { Decision: d.Decision, Reviewer: reviewer, 'Reason / note': d['Reason / note'], slack_user: d.slack_user, slack_ts: d.slack_ts } }];"
-      }
-    },
-    {
-      "id": "117ca9ab-9390-44e6-84e4-500589ce308d",
+      "id": "2157043d-8de5-47d6-ad29-9765af352cb7",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -705,7 +544,7 @@
       }
     },
     {
-      "id": "d74a31bb-5f4e-4184-9ec6-e226d80eb432",
+      "id": "7bed0b93-283a-4a92-84ae-7b8ce6ac0476",
       "name": "Record decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -728,7 +567,7 @@
       }
     },
     {
-      "id": "71313484-577c-46a6-b930-95de6af3eb08",
+      "id": "83bfe2e8-5584-4ae6-be59-989f5b82e9df",
       "name": "Read assets",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -751,7 +590,7 @@
       }
     },
     {
-      "id": "eaa003e7-39cf-4efc-96e4-347d86253073",
+      "id": "ce791304-4978-48e4-982f-81ca5191fe1c",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
@@ -775,7 +614,7 @@
       }
     },
     {
-      "id": "ae71c9dd-51ec-44dc-83cc-bd0e7c8c4386",
+      "id": "c4fe3113-68fd-4c11-8d69-a0cb11071da8",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -788,7 +627,7 @@
       }
     },
     {
-      "id": "57ba70a2-7a03-468d-9457-c36caf6d7927",
+      "id": "806b4766-3b55-4395-aa09-1bc4d26d8ad1",
       "name": "Snapshot registry",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -811,7 +650,7 @@
       }
     },
     {
-      "id": "a7a76c8b-27b3-4c91-9221-14f426543d6b",
+      "id": "4b123cdc-b8a0-488f-bc7a-f1bf3402fcd4",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -824,7 +663,7 @@
       }
     },
     {
-      "id": "baf2b34a-e5ba-4a97-a05c-6a7eb0c7283e",
+      "id": "16d2c04e-3446-43df-82e2-cdc389437d46",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1026,116 +865,14 @@
       "main": [
         [
           {
-            "node": "Post to the review thread",
+            "node": "Notify reviewer (Slack)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Post to the review thread": {
-      "main": [
-        [
-          {
-            "node": "Has a file?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has a file?": {
-      "main": [
-        [
-          {
-            "node": "Read labelled file",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Wait for the thread",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read labelled file": {
-      "main": [
-        [
-          {
-            "node": "Attach to the thread",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Attach to the thread": {
-      "main": [
-        [
-          {
-            "node": "Wait for the thread",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait for the thread": {
-      "main": [
-        [
-          {
-            "node": "Read the thread",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Read the thread": {
-      "main": [
-        [
-          {
-            "node": "Decided in the thread?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Decided in the thread?": {
-      "main": [
-        [
-          {
-            "node": "Decision found?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Decision found?": {
-      "main": [
-        [
-          {
-            "node": "Who answered",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Wait for the thread",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Who answered": {
+    "Notify reviewer (Slack)": {
       "main": [
         [
           {
