@@ -463,8 +463,16 @@ kit_nodes = [
       node("Post to the review thread", "n8n-nodes-base.slack", 2.7, {
         "resource": "message", "operation": "post", "select": "channel",
         "channelId": {"__rl": True, "mode": "name", "value": SLACK_CHANNEL},
-        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\nFile: ' + ($('Build manifest').first().json.labelled_path || 'text') + '\\nReply in this thread: *approve* · *editorial* (text only, you take editorial responsibility) · *return <reason>*' }}",
+        "text": "={{ ':vertical_traffic_light: *AI Act gate* · ' + $('Build manifest').first().json.line + ' · ' + $('Build manifest').first().json.asset_type + ' · ' + $('Build manifest').first().json.category + ' · model ' + $('Build manifest').first().json.model + '\\n' + $('Build manifest').first().json.disclosure_sentence + '\\n' + ($('Build manifest').first().json.prompt ? 'Prompt: _' + String($('Build manifest').first().json.prompt).slice(0, 300) + '_\\n' : '') + ($('Build manifest').first().json.shows ? 'Shows: ' + $('Build manifest').first().json.shows + ($('Build manifest').first().json.consent_reference ? ' · consent ' + $('Build manifest').first().json.consent_reference : '') + '\\n' : '') + ($('Build manifest').first().json.disclosed_text ? '>' + String($('Build manifest').first().json.disclosed_text).slice(0, 900).replace(/\\n/g, '\\n>') + '\\n' : ($('Build manifest').first().json.labelled_path ? 'File: ' + $('Build manifest').first().json.labelled_path + ' (attached below)\\n' : '')) + 'Reply in this thread: *approve* · *editorial* (text only, you take editorial responsibility) · *return <reason>*' }}",
         "otherOptions": {}}, X(9), 300, credentials=SLACK),
+      node("Has a file?", "n8n-nodes-base.if", 2.2, {"conditions": {"options": {"caseSensitive": True, "leftValue": "", "typeValidation": "loose", "version": 2},
+        "conditions": [{"id": nid(), "leftValue": "={{ $('Build manifest').first().json.labelled_path || '' }}", "rightValue": "", "operator": {"type": "string", "operation": "notEmpty", "singleValue": True}}], "combinator": "and"}, "options": {}}, X(9), 460),
+      node("Read labelled file", "n8n-nodes-base.readWriteFile", 1, {"operation": "read", "fileSelector": "={{ $('Build manifest').first().json.labelled_path }}", "options": {"dataPropertyName": "data"}}, X(10), 460, onError="continueRegularOutput"),
+      node("Attach to the thread", "n8n-nodes-base.slack", 2.7, {
+        "resource": "file", "operation": "upload", "binaryPropertyName": "data",
+        "options": {"channelId": "={{ $('Post to the review thread').first().json.channel }}", "threadTs": "={{ $('Post to the review thread').first().json.ts || $('Post to the review thread').first().json.message.ts }}",
+                    "fileName": "={{ String($('Build manifest').first().json.labelled_path).split('/').pop() }}", "title": "={{ $('Build manifest').first().json.label_text || 'labelled asset' }}"}},
+        X(11), 460, onError="continueRegularOutput", credentials=SLACK, notes="Needs the files:write scope on the Slack app. Without it the upload is skipped and the thread still carries the file path."),
       node("Wait for the thread", "n8n-nodes-base.wait", 1.1, {"resume": "timeInterval", "amount": SLACK_POLL_SECONDS, "unit": "seconds"}, X(10), 300, webhookId="a1b2c3d4-0005-4000-8000-aiactpoll0001"),
       node("Read the thread", "n8n-nodes-base.slack", 2.7, {
         "resource": "channel", "operation": "replies", "channelId": {"__rl": True, "mode": "id", "value": "={{ $('Post to the review thread').first().json.channel }}"},
@@ -505,7 +513,8 @@ kit_conn = wire(
     ("Image?", "Label image (Edit Image)", 0), ("Image?", "No burn-in", 1),
     ("Label image (Edit Image)", "Write labelled file", 0), ("Label image (Edit Image)", "No burn-in", 1),
     ("Write labelled file", "Burned in"), ("Burned in", "Build manifest"), ("No burn-in", "Build manifest"),
-    *(( ("Build manifest", "Store asset"), ("Store asset", "Post to the review thread"), ("Post to the review thread", "Wait for the thread"),
+    *(( ("Build manifest", "Store asset"), ("Store asset", "Post to the review thread"), ("Post to the review thread", "Has a file?"),
+        ("Has a file?", "Read labelled file", 0), ("Has a file?", "Wait for the thread", 1), ("Read labelled file", "Attach to the thread"), ("Attach to the thread", "Wait for the thread"),
         ("Wait for the thread", "Read the thread"), ("Read the thread", "Decided in the thread?"), ("Decided in the thread?", "Decision found?"),
         ("Decision found?", "Who answered", 0), ("Decision found?", "Wait for the thread", 1), ("Who answered", "Review & approve"),
         ("Review & approve", "Resolve decision") ) if GATE_MODE == "slack" else

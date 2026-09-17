@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Act Transparency Kit · deck</title>
+<style>
+  :root { --bg:#0f1420; --card:#171d2b; --line:#2a3245; --ink:#eef2f8; --muted:#9aa5b8; --accent:#f2b544; --green:#3ecf8e; --red:#ff6b6b; --blue:#6aa9ff; }
+  * { box-sizing:border-box }
+  html, body { margin:0; background:#05070c; color:var(--ink); font-family:-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased }
+  .deck { display:flex; flex-direction:column; align-items:center; gap:32px; padding:32px 0 }
+  .slide { width:1080px; height:1350px; background:var(--bg); position:relative; overflow:hidden; padding:88px 84px; display:flex; flex-direction:column; border-radius:6px; flex:0 0 auto }
+  .slide::after { content:attr(data-n) " / 10"; position:absolute; right:84px; bottom:56px; color:var(--muted); font-size:22px; letter-spacing:.04em }
+  .kicker { color:var(--accent); font-size:24px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; margin:0 0 26px }
+  h1 { font-size:78px; line-height:1.02; margin:0 0 30px; font-weight:800; letter-spacing:-.02em }
+  h2 { font-size:62px; line-height:1.06; margin:0 0 28px; font-weight:800; letter-spacing:-.02em }
+  p, li { font-size:30px; line-height:1.4; color:var(--ink); margin:0 }
+  p.sub, .muted { color:var(--muted) }
+  .lead { font-size:36px; line-height:1.35 }
+  .note { font-size:24px; color:var(--muted); line-height:1.4 }
+  ul { padding-left:34px; margin:0 }
+  li + li { margin-top:14px }
+  .grow { flex:1 }
+  .shot { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff }
+  .shot img { display:block; width:100%; height:auto }
+  .row { display:flex; gap:24px }
+  .col { flex:1; min-width:0 }
+  .cap { font-size:22px; color:var(--muted); margin-top:12px; line-height:1.35 }
+  .tag { display:inline-block; padding:4px 12px; border-radius:999px; font-size:20px; font-weight:700; letter-spacing:.02em }
+  .t-green { background:rgba(62,207,142,.16); color:var(--green) }
+  .t-red { background:rgba(255,107,107,.18); color:var(--red) }
+  .t-amber { background:rgba(242,181,68,.18); color:var(--accent) }
+  .t-blue { background:rgba(106,169,255,.18); color:var(--blue) }
+  .t-grey { background:rgba(154,165,184,.18); color:var(--muted) }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px 30px }
+  .num { font-size:96px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--ink) }
+  .num small { font-size:30px; color:var(--muted); font-weight:600; margin-left:8px; letter-spacing:0 }
+  .lbl { font-size:24px; color:var(--muted); margin-top:10px }
+  table { width:100%; border-collapse:collapse; font-size:24px }
+  th { text-align:left; color:var(--muted); font-weight:600; font-size:19px; letter-spacing:.06em; text-transform:uppercase; padding:0 12px 14px 0; border-bottom:1px solid var(--line) }
+  td { padding:16px 12px 16px 0; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.35 }
+  code { font-family:ui-monospace, "SF Mono", Menlo, monospace; font-size:.9em; color:#cdd6e6 }
+  .foot { display:flex; justify-content:space-between; align-items:flex-end; color:var(--muted); font-size:22px }
+  .foot b { color:var(--ink) }
+  .art { display:grid; grid-template-columns:1fr 1fr; gap:22px }
+  .art .cell { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:26px 28px }
+  .art h3 { margin:0 0 10px; font-size:30px }
+  .art p { font-size:24px; color:var(--muted) }
+  .hl { color:var(--accent) }
+  .bar { height:8px; width:120px; background:var(--accent); border-radius:4px; margin:0 0 40px }
+  .qr { position:absolute; left:84px; bottom:56px; color:var(--muted); font-size:22px }
+  .step { display:flex; gap:22px; align-items:flex-start }
+  .step .n { flex:0 0 52px; height:52px; border-radius:50%; background:var(--accent); color:#0f1420; font-weight:800; font-size:28px; display:flex; align-items:center; justify-content:center }
+  .step p { font-size:27px }
+  .step + .step { margin-top:22px }
+  .imgs3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px }
+  .imgs3 .shot img { aspect-ratio:3/4; object-fit:cover }
+  @media screen and (max-width:1160px) { .deck { transform-origin:top center; zoom:calc(100vw / 1130) } }
+  @media print {
+    @page { size:1080px 1350px; margin:0 }
+    html, body { background:var(--bg) }
+    .deck { display:block; padding:0; gap:0 }
+    .slide { border-radius:0; page-break-after:always; break-after:page; margin:0 }
+    .slide:last-child { page-break-after:auto; break-after:auto }
+    .toolbar { display:none }
+  }
+  .toolbar { position:fixed; top:16px; right:16px; display:flex; gap:10px; z-index:9 }
+  .toolbar a { background:#fff; color:#0f1420; text-decoration:none; font-size:14px; font-weight:700; padding:10px 14px; border-radius:8px }
+</style>
+</head>
+<body>
+<div class="toolbar"><a href="ai-act-transparency-kit-carousel.pdf">PDF</a><a href="../">Case page</a></div>
+<div class="deck">
+
+<!-- 1 -->
+<section class="slide" data-n="1">
+  <p class="kicker">EU AI Act · Article 50 · n8n</p>
+  <h1>The human is the gate.<br>The ledger cannot be edited.</h1>
+  <p class="lead sub">An n8n module that turns Article 50 transparency duties into one approval step inside any production line: label, ask a person in Slack, write an append-only record, keep a registry of every AI system on the instance.</p>
+  <div class="grow"></div>
+  <div class="foot">
+    <div><b>Ruslan Karymov</b><br>AI &amp; Automation Lead · Varna, Bulgaria</div>
+    <div>github.com/karusrus/transparency-kit</div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide" data-n="2">
+  <p class="kicker">Why this exists</p>
+  <h2>From 2 August 2026 the deployer, not the model vendor, answers for these.</h2>
+  <div class="art">
+    <div class="cell"><h3>Art. 50(4) §1 · deep fakes</h3><p>Generated or manipulated image, audio or video that resembles a real person, place, object or event must be labelled. Artistic or satirical work: limited disclosure.</p></div>
+    <div class="cell"><h3>Art. 50(4) §2 · public-interest text</h3><p>AI-generated text published to inform the public must be disclosed, unless a named person took editorial responsibility.</p></div>
+    <div class="cell"><h3>Art. 50(1) · chatbots</h3><p>A system that talks to people must make its AI nature clear unless it is obvious.</p></div>
+    <div class="cell"><h3>Art. 50(3) · emotion &amp; biometrics</h3><p>People exposed to emotion recognition or biometric categorisation must be told.</p></div>
+  </div>
+  <div class="grow"></div>
+  <p class="lead">Most automation lines wire a generator straight into a publish node. Nothing in between knows the law. That gap is what the kit fills.</p>
+</section>
+
+<!-- 3 -->
+<section class="slide" data-n="3">
+  <p class="kicker">Where it sits</p>
+  <h2>One sub-workflow call inside any n8n line.</h2>
+  <div class="shot"><img src="map-line.png" alt="Production line calling the AI Act gate as a sub-workflow"></div>
+  <p class="cap">A real line: notice text → three local TTS voices → <b>AI Act gate</b> → publish only what a human approved. The map is generated from the running workflows, not drawn.</p>
+  <div class="grow"></div>
+  <div class="step"><div class="n">1</div><p>The line passes the asset, the model, the prompt and what it depicts.</p></div>
+  <div class="step"><div class="n">2</div><p>The kit classifies under Article 50, burns the label in, stores a manifest.</p></div>
+  <div class="step"><div class="n">3</div><p>A person decides in Slack. The kit returns <code>approved</code>, <code>disclosure_status</code> and the labelled file.</p></div>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-n="4">
+  <p class="kicker">Intake → label</p>
+  <h2>A real place, altered, is a deep fake. No person needed.</h2>
+  <div class="imgs3">
+    <div><div class="shot"><img src="real-place.jpg" alt="Original photo of a street in Varna"></div><p class="cap">Original photo. Varna, fog.</p></div>
+    <div><div class="shot"><img src="labelled-manipulated.jpg" alt="Manipulated photo with the burnt-in label"></div><p class="cap">A building added at the end of the street. <span class="tag t-red">AI-manipulated</span> label burnt in, sentence goes under the photo.</p></div>
+    <div><div class="shot"><img src="labelled-satire.jpg" alt="Same manipulation declared as satire, small corner label"></div><p class="cap">Same alteration declared as satire. Disclosure limited to a corner label, as Art. 50(4) allows.</p></div>
+  </div>
+  <div class="grow"></div>
+  <p class="lead">Art. 3(60) covers persons, objects, places and events. The classifier reads four intake answers: what it shows, generated or manipulated, artistic or not, consent reference.</p>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-n="5">
+  <p class="kicker">The gate</p>
+  <h2>A person decides in a Slack thread. The kit only listens.</h2>
+  <div class="row">
+    <div class="col"><div class="shot"><img src="slack-place.png" alt="Slack thread with the labelled photo and an approve reply"></div></div>
+    <div class="col"><div class="shot"><img src="slack-person.png" alt="Slack thread with a labelled portrait and an approve reply"></div></div>
+  </div>
+  <p class="cap">Post with the disclosure sentence and the labelled file → reply <b>approve</b>, <b>editorial</b> or <b>return &lt;reason&gt;</b>. Reviewer identity comes from Slack, not from a text field.</p>
+  <div class="grow"></div>
+  <ul>
+    <li>Outbound polling only. n8n needs no public address, no inbound webhook.</li>
+    <li>No answer in 24 h → the asset is returned automatically and logged as such.</li>
+    <li>Swap Slack for a form, Teams or e-mail: the gate is one node group.</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section class="slide" data-n="6">
+  <p class="kicker">The record</p>
+  <h2>Append-only ledger, hash-chained. Three real rows.</h2>
+  <table>
+    <tr><th>Asset</th><th>Reviewer</th><th>Decision</th><th>Status</th><th>prev → hash</th></tr>
+    <tr><td>text · gpt-4o<br><span class="muted">public notice</span></td><td>Ruslan<br><span class="muted">Slack U0C2N5PEJJV</span></td><td>approve · dates checked against the municipal order</td><td><span class="tag t-green">disclosed</span></td><td><code>84c55f81 → 92d911ce</code></td></tr>
+    <tr><td>image · Photoshop GF<br><span class="muted">real place, manipulated</span></td><td>Ruslan<br><span class="muted">Slack U0C2N5PEJJV</span></td><td>approve · label says manipulated, sentence under the photo</td><td><span class="tag t-green">disclosed</span></td><td><code>5f9ee8ae → 84c55f81</code></td></tr>
+    <tr><td>image · Midjourney<br><span class="muted">real person, consent on file</span></td><td>Ruslan<br><span class="muted">Slack U0C2N5PEJJV</span></td><td>approve · consent is my own signature</td><td><span class="tag t-green">disclosed</span></td><td><code>54c702cf → 5f9ee8ae</code></td></tr>
+  </table>
+  <div class="grow"></div>
+  <div class="row">
+    <div class="col card"><p><b>Postgres, two triggers.</b></p><p class="note">BEFORE INSERT computes sha256 over the previous hash and the row. UPDATE and DELETE raise. <code>verify_chain()</code> walks the chain on every audit render.</p></div>
+    <div class="col card"><p><b>What an auditor asks first.</b></p><p class="note">Who decided, when, on what basis, and can the record be changed afterwards. Four answers, one table.</p></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="slide" data-n="7">
+  <p class="kicker">The registry</p>
+  <h2>Every AI system on the instance, with the path to people.</h2>
+  <div class="shot"><img src="audit-top.png" alt="Registry with path analysis on the audit view"></div>
+  <div class="grow"></div>
+  <p class="lead">The kit reads all workflows through the n8n API and walks from every model node forward. What stands between the generator and the exit decides the status:</p>
+  <p style="margin-top:18px"><span class="tag t-red">uncovered</span> <span class="tag t-red">inform</span> <span class="tag t-amber">chatbot</span> <span class="tag t-green">disclosed</span> <span class="tag t-grey">internal</span> <span class="tag t-blue">editorial</span></p>
+</section>
+
+<!-- 8 -->
+<section class="slide" data-n="8">
+  <p class="kicker">The audit view</p>
+  <h2>What the auditor reads instead of the pipeline.</h2>
+  <div class="shot"><img src="audit-deepfakes.png" alt="Synthetic media and deep fakes section of the audit view"></div>
+  <p class="cap">Section 2 of the audit view: every synthetic asset with what it shows, consent reference, disclosure method, model, prompt hash, operator, status, artefact path.</p>
+  <div class="grow"></div>
+  <ul>
+    <li>One GET endpoint, rendered from the ledger. No spreadsheet kept by hand.</li>
+    <li>Four sections: registry (Art. 4 literacy, voluntary) · synthetic media (Art. 50(4) §1) · generated text (Art. 50(4) §2) · approval log.</li>
+    <li>Legal basis on every block. Voluntary items are labelled voluntary.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section class="slide" data-n="9">
+  <p class="kicker">Numbers from the ledger</p>
+  <h2>Demo instance, one day, one reviewer.</h2>
+  <div class="row">
+    <div class="col card"><div class="num">61</div><div class="lbl">decisions logged</div></div>
+    <div class="col card"><div class="num">13<small>%</small></div><div class="lbl">returned for changes</div></div>
+    <div class="col card"><div class="num">5<small>s</small></div><div class="lbl">median decision time</div></div>
+  </div>
+  <div class="row" style="margin-top:24px">
+    <div class="col card"><div class="num">18</div><div class="lbl">AI systems on the instance</div></div>
+    <div class="col card"><div class="num">6</div><div class="lbl">workflows scanned</div></div>
+    <div class="col card"><div class="num">5</div><div class="lbl">paths flagged: 2 uncovered, 2 chatbot, 1 inform</div></div>
+  </div>
+  <div class="grow"></div>
+  <p class="lead">These are demo numbers, not a production benchmark: I answered my own requests within seconds. What the numbers prove is the mechanics: every decision landed, the chain verified after each run, nothing was edited by hand.</p>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-n="10">
+  <p class="kicker">Take it</p>
+  <h2>Import the JSON. Point it at your line. Add a Slack channel.</h2>
+  <div class="card"><p><b>Repository</b><br><span class="muted">github.com/karusrus/transparency-kit</span></p></div>
+  <div class="card" style="margin-top:18px"><p><b>Case page and live map</b><br><span class="muted">karusrus.github.io/transparency-kit · karusrus.github.io/pipeline-map</span></p></div>
+  <div class="grow"></div>
+  <p class="lead">What I do in a team's first month: inventory every line that calls a model, put the gate where content reaches people, hand compliance a page they can read without opening n8n.</p>
+  <div class="foot" style="margin-top:40px">
+    <div><b>Ruslan Karymov</b><br>AI &amp; Automation Lead · open to EU remote and Bulgaria</div>
+    <div>linkedin.com/in/ruslankarymov</div>
+  </div>
+</section>
+
+</div>
+<script>
+  // arrows / space move between slides on screen
+  const slides=[...document.querySelectorAll('.slide')]; let i=0;
+  const go=n=>{i=Math.max(0,Math.min(slides.length-1,n)); slides[i].scrollIntoView({behavior:'smooth',block:'start'})};
+  addEventListener('keydown',e=>{ if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();go(i+1)} if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(i-1)} });
+</script>
+</body>
+</html>
