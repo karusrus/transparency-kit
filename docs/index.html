@@ -47,31 +47,30 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
 </header>
 
 <section>
-  <h2>One thesis, two lines</h2>
-  <p class="sub">The same pattern twice: a system does the volume, a person approves, the numbers are reported in the units of the operation. The first line was pitched before it existed; the second runs and produces evidence while it does.</p>
-  <div class="two">
-    <div class="card">
-      <a href="https://karusrus.github.io/pipeline-map/"><img src="https://karusrus.github.io/assets/w-pipeline-overview.jpg" alt="Ad-creative production pipeline draft in Pipeline Map"></a>
-      <div class="b">
-        <p class="kicker">Line 1 · the pitch</p>
-        <h3>Ad-creative production at volume</h3>
-        <p>Brief → concepts → static and video branches → agents on the gates → one human inbox for exceptions. Drawn for a test assignment in an evening; the pattern that produced <b>300 creatives a day</b> where one was made by hand.</p>
-        <div class="num">300<small>creatives / day · ROAS +50–70%</small></div>
-        <p><a href="https://karusrus.github.io/pipeline-map/">Open the draft →</a></p>
-      </div>
-    </div>
-    <div class="card">
-      <a href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2"><img src="map-line.png" alt="The AI Act line: Kokoro voices, the gate, publication"></a>
-      <div class="b">
-        <p class="kicker">Line 2 · the governance</p>
-        <h3>The same gate, now producing evidence</h3>
-        <p>Text → three synthetic voices → <b>AI Act gate</b> → publish only what a person approved. The registry reads every workflow on the instance and flags the ones where AI output reaches people with no disclosure and no human.</p>
-        <div class="num" id="n-cov">18<small>AI systems found · 2 uncovered · 1 must inform · 2 chatbot · 30 decisions in a hash-chained ledger</small></div>
-        <p><a href="https://karusrus.github.io/pipeline-map/?import=docs/transparency-kit.bundle.json&slot=2">Open the live map →</a></p>
-      </div>
-    </div>
+  <h2>What is in the box</h2>
+  <p class="sub">Nine pieces, one repository. Your line calls the module; everything else fills itself. The only model in the box is a local text-to-speech voice in the demo line; the kit itself generates nothing, it labels and records what your generators produce.</p>
+  <style>
+    .mods{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}
+    .mod{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+    .mod h3{margin:0 0 6px;font-size:16px}.mod p{margin:0;color:var(--mut);font-size:14px;line-height:1.45}
+    .mod .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin:0 0 8px}
+    .mod.you{border-style:dashed}.mod.core{border-color:var(--acc)}
+    .flow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 6px;color:var(--mut);font-size:14px}
+    .flow b{color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:600}
+    @media(max-width:860px){.mods{grid-template-columns:1fr}}
+  </style>
+  <div class="flow"><b>your line</b> → <b>AI Act gate</b> → <b>label</b> → <b>a person in Slack</b> → <b>ledger</b> → <b>registry</b> → <b>audit page</b> → <b>back to your line</b></div>
+  <div class="mods">
+    <div class="mod you"><p class="k">Yours</p><h3>Any n8n line</h3><p>A workflow that ends in a publish node. It adds one <b>Execute Sub-workflow</b> call before publishing and gets back <code>approved</code>, <code>disclosure_status</code> and the labelled file.</p></div>
+    <div class="mod core"><p class="k">Module · workflows/transparency-kit.json</p><h3>AI Act Transparency Kit</h3><p>Classifies under Art. 50 and Art. 3(60), fixed disclosure sentence per language, provenance manifest, the gate, the record, the registry snapshot. No model inside.</p></div>
+    <div class="mod"><p class="k">Service · tools/media-label</p><h3>Label service</h3><p>A small container with a static ffmpeg: burns the label into images and video, writes it into audio metadata. Unreachable? Images fall back to n8n's Edit Image node, the rest is disclosed at publication.</p></div>
+    <div class="mod"><p class="k">Gate · Slack thread or form</p><h3>Human approval</h3><p>Post to <code>#ai-act-gate</code>, poll the thread, take the reviewer's identity from Slack. No Slack? A Wait-node form, no credentials at all.</p></div>
+    <div class="mod"><p class="k">Storage · db/schema.sql</p><h3>Postgres ledger</h3><p>Assets, decisions, registry snapshots. Decisions are append-only and hash-chained by database triggers; <code>verify_chain()</code> runs on every audit render.</p></div>
+    <div class="mod"><p class="k">Page · workflows/audit-view.json</p><h3>Audit view</h3><p><code>GET /webhook/audit</code>: what an auditor reads instead of the pipeline. Registry with path analysis, synthetic media, generated text, approval log.</p></div>
+    <div class="mod"><p class="k">Demo · workflows/host-line.json</p><h3>Recycling notice · three voices</h3><p>A real line with the module inside: text → three local Kokoro voices → gate → publish. The only model in the repository, and only here.</p></div>
+    <div class="mod"><p class="k">Samples · three inactive lines</p><h3>Lines the registry flags</h3><p>A social drafter with no gate (<i>uncovered</i>), a support inbox scoring emotion with nobody told (<i>inform</i>), a chatbot that never says it is one (<i>chatbot</i>).</p></div>
+    <div class="mod"><p class="k">Picture · pipeline-map importer</p><h3>The map below</h3><p>Generated from the exported workflow JSON and the registry, not drawn. Every block on this page is a node on the map.</p></div>
   </div>
-  <p class="sub">The map that sold the first line is the same tool that now draws the second from a live workflow export: the picture is generated from the n8n JSON and the registry, not drawn.</p>
 </section>
 
 <section>
@@ -114,6 +113,19 @@ code{font:13px ui-monospace,Menlo,monospace;background:#1f2530;padding:1px 6px;b
     <tr><td><span class="pill bad">inform</span></td><td>emotion recognition or biometric categorisation runs on people who are not told</td><td>Art. 50(3), publishing or not; tag the node that informs them</td></tr>
     <tr><td><span class="pill warn">chatbot</span></td><td>a system talks to people without saying it is an AI</td><td>Art. 50(1); tag the node that discloses it</td></tr>
   </table>
+</section>
+
+<section>
+  <h2>Install it: ten minutes, one machine</h2>
+  <p class="sub">Docker and Python 3. No model, no GPU, no API key: the kit labels and records what your generators produce, it does not generate. Works with any model your line already calls, because the line only passes the model's name and the prompt.</p>
+  <ol class="steps">
+    <li><b>Clone and start.</b> <code>git clone https://github.com/karusrus/transparency-kit && cd transparency-kit && ./reload.sh</code> — Postgres, the label service and stock n8n come up on one Docker network; the six workflows are imported and published.</li>
+    <li><b>Create the n8n owner</b> at <code>localhost:5678</code>, once.</li>
+    <li><b>Send an asset</b> through <code>/form/ai-act-intake</code>; decide at the form gate; read <code>/webhook/audit</code>.</li>
+    <li><b>Optional, registry:</b> an n8n API key attached to the node <i>Read all workflows</i>, so the page lists every AI system on the instance.</li>
+    <li><b>Optional, Slack gate:</b> a Slack app with five scopes, one credential, <code>GATE_MODE=slack</code> in <code>.env</code>, <code>./update.sh</code>.</li>
+  </ol>
+  <p class="sub">After that, embedding in your own line is three nodes, below.</p>
 </section>
 
 <section>

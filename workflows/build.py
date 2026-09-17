@@ -10,7 +10,7 @@
 
 Run:  python3 workflows/build.py
 """
-import json, uuid, pathlib
+import json, uuid, pathlib, os
 
 HERE = pathlib.Path(__file__).parent
 DATA = "/data"
@@ -25,7 +25,7 @@ KOKORO_URL = "http://host.docker.internal:8880/tts"
 MEDIA_LABEL_URL = "http://kit-media-label:8881/label"   # ffmpeg label service in its own container; if unreachable, images fall back to Edit Image, media to "disclosure at publication"
 # Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
 PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
-GATE_MODE = "slack"          # "form": Wait node with a form (works everywhere) · "slack": Slack Send-and-Wait with the same form, channel members only
+GATE_MODE = os.environ.get("GATE_MODE", "form")   # "form": Wait node with a form (works everywhere, no credentials) · "slack": post to a thread, poll it, reviewer identity from Slack. Set GATE_MODE=slack in .env
 SLACK_CHANNEL = "#ai-act-gate"
 SLACK = {"slackApi": {"id": "yqaUQ2SkfGomOHLf", "name": "Slack_pipeline_approval"}}   # created by hand in the editor; id is instance-local
 SLACK_POLL_SECONDS = 20

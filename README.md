@@ -2,7 +2,7 @@
 
 Importable n8n workflows that make EU AI Act transparency a property of the production line, not a report written before the audit.
 
-- **AI Act Transparency Kit** — a module any line calls with *Execute Sub-workflow* (or its own intake form): classification under Article 50 → label (ffmpeg) and provenance manifest → **human approval gate** (Wait node, form) → approval log → **AI-systems registry of the whole n8n instance with path analysis**: from every node that calls a model, every path forward to a node that reaches people, and what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller.
+- **AI Act Transparency Kit** — a module any line calls with *Execute Sub-workflow* (or its own intake form): classification under Article 50 → label (ffmpeg service) and provenance manifest → **human approval gate** (a form, or a Slack thread) → approval log → **AI-systems registry of the whole n8n instance with path analysis**: from every node that calls a model, every path forward to a node that reaches people, and what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller.
 - **Audit view** — `GET /webhook/audit`: assets awaiting a human (with gate links), the registry, synthetic media, generated text, the approval log. Read from the Postgres ledger; the approval log is append-only and hash-chained, and the chain is verified on every render.
 - **Recycling notice · three voices** — a real line with the kit as a module: text → Kokoro-82M (local TTS, three stock voices) → AI Act gate → publish only what a human approved.
 - **Sample: social post drafter** — a marketing line without any gate, so the registry has something to flag.
@@ -36,7 +36,7 @@ Only media files (incoming and labelled) stay on disk under `data/`.
 
 ## The gate: form or a Slack thread
 
-`GATE_MODE` in `workflows/build.py`:
+`GATE_MODE` in `.env` (read by `build.py`, default `form`):
 
 - `form` (default) — a Wait node with a form. Works anywhere; the link is on the audit view and, if a Slack credential is attached, posted to `#ai-act-gate` by **Notify reviewer**. Reviewer identity is whatever the person types.
 - `slack` — the kit posts the asset to a thread in `#ai-act-gate` and then **polls the thread** every 20 s (Slack → channel → replies) until a channel member answers `approve`, `editorial` or `return <reason>`. All traffic is outbound: n8n needs no public address, only a bot token with `chat:write`, `channels:read`, `channels:history`, `users:read`, and `files:write` if you want the labelled file attached to the thread (without that scope the upload is skipped and the thread carries the file path). Text assets are quoted in the post, so the reviewer decides without leaving Slack. The reviewer's identity comes from Slack (`users.info`), not from a text field, which answers the auditor's first question. After 24 h without an answer the asset is returned automatically. Verified end to end on 17 Sep 2026: a reply `approve` in the thread landed in the ledger as `Ruslan (Slack U…)`.
@@ -88,22 +88,29 @@ Three inactive sample lines exist so the registry has something to judge: `sampl
 
 Scope is deliberate: deployer duties under Article 50 (in force 2 August 2026) and Article 4. High-risk obligations (Annex III) are out of scope and not claimed.
 
-## Run it locally
+## Quick start (ten minutes, one machine)
 
-Stock n8n is a hardened image without a package manager, so the Dockerfile adds a static ffmpeg and one font.
+Needs Docker and Python 3. No model, no GPU, no API key: the kit labels and records what *your* generators produce.
 
 ```bash
-docker build -t n8n-ffmpeg .
-./reload.sh        # first time only: starts Postgres, the media-label service and n8n on a Docker network, loads db/schema.sql, imports the DB credential and all workflows, publishes them
-../teardown-engine/.venv/bin/python tools/kokoro_server.py --port 8880   # local TTS for the three-voices line (kokoro-onnx)
-./demo.sh          # seeds four assets and four decisions through the intake form
-open http://localhost:5678/form/notice          # the three-voices line; gates appear on the audit view
-open http://localhost:5678/form/ai-act-intake   # the kit's own intake form
-open http://localhost:5678/webhook/audit        # audit view
-./update.sh        # after editing workflows/build.py: re-import and publish, keeps owner, API key and credentials
+git clone https://github.com/karusrus/transparency-kit && cd transparency-kit
+./reload.sh                                   # Postgres + label service + stock n8n on one Docker network; imports and publishes all workflows
+open http://localhost:5678                    # create the n8n owner account (once)
+open http://localhost:5678/form/ai-act-intake # send the first asset through the gate
+open http://localhost:5678/webhook/audit      # the auditor's page, filled from the ledger
 ```
 
-`reload.sh` deletes both volumes: the n8n owner account, API key and credentials, and the ledger. Use `update.sh` for everything after the first run. The database password is generated into `.env` and `secrets/postgres-credential.json` on first run (both git-ignored); the credential id `KitPostgresCred01` is fixed so the workflow JSON can reference it.
+That is the whole install for the default **form gate**: every asset waits at a form, the link sits on the audit view. Two optional steps unlock the rest:
+
+| Optional | Why | How |
+|---|---|---|
+| **AI-systems registry** | reads every workflow on the instance | *Settings → n8n API* → create a key (scope `workflow:list`), add an *n8n API* credential (base URL `http://localhost:5678/api/v1`), attach it to the node **Read all workflows**, publish |
+| **Slack gate** | reviewers answer in a thread, identity from Slack | a Slack app with `chat:write`, `channels:read`, `channels:history`, `users:read`, `files:write`; a *Slack API* credential in n8n; `GATE_MODE=slack` in `.env`, then `./update.sh` |
+| **Demo line with voices** | the three-voices example needs a local TTS | `python tools/kokoro_server.py --port 8880` (kokoro-onnx, CPU) |
+
+Which models does it work with? Any. The line passes the generator's name (`model`, `model_version`) and the prompt; the kit hashes the prompt, fixes the disclosure sentence and never calls a model itself. The only model in this repository is the demo voice.
+
+`reload.sh` deletes both volumes: the n8n owner account, API key and credentials, and the ledger. Use `update.sh` for everything after the first run (it re-imports the workflows and keeps everything else). The database password is generated into `.env` and `secrets/postgres-credential.json` on first run (both git-ignored); the credential id `KitPostgresCred01` is fixed so the imported workflows bind to it.
 
 Environment the kit needs (already in `reload.sh`):
 
@@ -111,8 +118,6 @@ Environment the kit needs (already in `reload.sh`):
 |---|---|
 | `N8N_RESTRICT_FILE_ACCESS_TO=/data` | the Read/Write File node may only touch the mounted media folder |
 | `N8N_RUNNERS_ENABLED=true` | Code nodes run in the task runner |
-
-The **AI-systems registry** lists every workflow on the instance through the n8n API. Create an API key in *Settings → n8n API* (scope `workflow:list` is enough), add an *n8n API* credential (base URL `http://localhost:5678/api/v1`) and attach it to the node **Read all workflows**, then publish. `workflows/build.py` carries the credential id of this instance so `update.sh` keeps the binding; on another instance attach it in the editor. Without it the node is skipped gracefully and the registry lists only the models declared in manifests.
 
 ## Files
 
@@ -129,7 +134,7 @@ db/schema.sql                assets · decisions (append-only, hash-chained) · 
 data/                        incoming/  labelled/  published/  (media only; the ledger is in Postgres)
 samples/                     synthetic test assets (ffmpeg testsrc), no people, no rights
 docs/                        screenshots and a static copy of the audit view
-reload.sh · update.sh · demo.sh · Dockerfile
+reload.sh · update.sh · demo.sh
 ```
 
 Manifest example:

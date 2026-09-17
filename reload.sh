@@ -5,6 +5,7 @@ set -e
 cd "$(dirname "$0")"
 [ -f .env ] || { echo "KIT_DB_PASSWORD=$(openssl rand -hex 16)" > .env; }
 . ./.env
+export GATE_MODE
 [ -f secrets/postgres-credential.json ] || { mkdir -p secrets; printf '[{"id":"KitPostgresCred01","name":"kit-db","type":"postgres","data":{"host":"kit-db","database":"kit","user":"kit","password":"%s","port":5432,"ssl":"disable","allowUnauthorizedCerts":false}}]\n' "$KIT_DB_PASSWORD" > secrets/postgres-credential.json; }
 python3 workflows/build.py
 docker rm -f n8n kit-db >/dev/null 2>&1 || true
@@ -22,8 +23,8 @@ docker run -d --name kit-media-label --network kit-net kit-media-label >/dev/nul
 docker run -d --name n8n --network kit-net -p 5678:5678 --add-host host.docker.internal:host-gateway \
   -v n8n_data:/home/node/.n8n -v "$PWD/data":/data -v "$PWD/workflows":/workflows:ro -v "$PWD/secrets":/secrets:ro \
   -e N8N_SECURE_COOKIE=false -e GENERIC_TIMEZONE=Europe/Sofia -e TZ=Europe/Sofia \
-  -e N8N_RUNNERS_ENABLED=true -e N8N_DIAGNOSTICS_ENABLED=false -e 'NODES_EXCLUDE=[]' -e N8N_RESTRICT_FILE_ACCESS_TO=/data \
-  n8n-ffmpeg >/dev/null
+  -e N8N_RUNNERS_ENABLED=true -e N8N_DIAGNOSTICS_ENABLED=false -e N8N_RESTRICT_FILE_ACCESS_TO=/data \
+  n8nio/n8n:latest >/dev/null
 sleep 16
 docker exec n8n n8n import:credentials --input=/secrets/postgres-credential.json | tail -1
 for f in transparency-kit audit-view sample-line sample-50-3 sample-chatbot host-line; do docker exec n8n n8n import:workflow --input=/workflows/$f.json | tail -1; done

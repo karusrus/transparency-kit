@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit — Audit view",
   "nodes": [
     {
-      "id": "15129345-5069-4d7a-8846-23ca0855ce8a",
+      "id": "59317f0f-edd6-4a41-8078-79b266f7ecc8",
       "name": "Audit request (GET)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -20,7 +20,7 @@
       "webhookId": "a1b2c3d4-0004-4000-8000-aiactaudit001"
     },
     {
-      "id": "78882729-2a70-436e-bc5e-959f088b79fe",
+      "id": "fcd17f29-170d-4a90-b54c-687c2ea9dd57",
       "name": "Read the ledger",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -43,7 +43,7 @@
       }
     },
     {
-      "id": "35aa8e4e-86ce-4d15-8044-e832e12c86dc",
+      "id": "c13399b2-b2ab-4b72-b095-ec9a3a50eb5a",
       "name": "Render audit view",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -56,7 +56,7 @@
       }
     },
     {
-      "id": "c426270b-34ac-4365-bb03-465a64e66fa0",
+      "id": "2375bb8c-cd1a-40ec-93d5-2baf61d5bf07",
       "name": "Respond HTML",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -80,7 +80,7 @@
       }
     },
     {
-      "id": "f6d1f8ad-722d-4ec9-beed-ca386895d2d5",
+      "id": "1bf0062b-994d-4eee-bd4d-576a916d7ef1",
       "name": "What this is",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,

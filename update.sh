@@ -2,6 +2,7 @@
 # Rebuild the JSON and push it into the running n8n WITHOUT wiping anything (keeps owner, API key, credentials, the database).
 set -e
 cd "$(dirname "$0")"
+[ -f .env ] && . ./.env; export GATE_MODE
 python3 workflows/build.py
 docker build -q -t kit-media-label tools/media-label >/dev/null
 docker rm -f kit-media-label >/dev/null 2>&1 || true
