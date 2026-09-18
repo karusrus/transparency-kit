@@ -46,14 +46,17 @@ create table if not exists registry_snapshots (
   registry     jsonb not null
 );
 
--- hash chain: computed inside the database, so the application never chooses its own hash
+-- hash chain: computed inside the database, so the application never chooses its own hash.
+-- The timestamp enters the preimage through to_char(... at time zone 'UTC'), not ::text: the text form of a
+-- timestamptz depends on the session's TimeZone and DateStyle, so ::text made the same row hash differently for
+-- an auditor in another zone and the chain read as tampered with. Chain format v2, 2026-09-18.
 create or replace function decisions_chain() returns trigger language plpgsql as $$
 declare last_hash text;
 begin
   select hash into last_hash from decisions order by seq desc limit 1;
   new.prev_hash := coalesce(last_hash, 'genesis');
   new.hash := encode(digest(
-      new.prev_hash || '|' || new.asset_id || '|' || new.decided_at::text || '|' || new.reviewer || '|' || new.decision
+      new.prev_hash || '|' || new.asset_id || '|' || to_char(new.decided_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '|' || new.reviewer || '|' || new.decision
       || '|' || coalesce(new.reason,'') || '|' || new.disclosure_status || '|' || coalesce(new.responsible_person,'') || '|' || coalesce(new.artefact,''),
       'sha256'), 'hex');
   return new;
@@ -66,14 +69,28 @@ create or replace function decisions_immutable() returns trigger language plpgsq
 begin raise exception 'decisions are append-only'; end $$;
 drop trigger if exists decisions_immutable_trg on decisions;
 create trigger decisions_immutable_trg before update or delete on decisions for each row execute function decisions_immutable();
+-- TRUNCATE never fires a row-level trigger, so it needs its own statement-level one
+drop trigger if exists decisions_no_truncate_trg on decisions;
+create trigger decisions_no_truncate_trg before truncate on decisions for each statement execute function decisions_immutable();
 
--- the auditor's check: recompute every hash from the previous row; returns rows that do not match
-create or replace function verify_chain() returns table(seq bigint, ok boolean) language sql as $$
+-- the auditor's check: recompute every hash from the previous row; returns rows that do not match.
+-- Two preimage formats are recognised: v2 (UTC, to_char — current) and v1 (decided_at::text — ledgers written
+-- before 2026-09-18). Both are deterministic functions of the same row, so accepting either does not let a row
+-- be forged: any change still breaks the chain from that seq onwards.
+drop function if exists verify_chain();
+create or replace function verify_chain() returns table(seq bigint, ok boolean, alg text) language sql as $$
   with c as (
     select d.seq, d.hash, d.prev_hash,
       lag(d.hash) over (order by d.seq) as expected_prev,
-      encode(digest(d.prev_hash || '|' || d.asset_id || '|' || d.decided_at::text || '|' || d.reviewer || '|' || d.decision
-        || '|' || coalesce(d.reason,'') || '|' || d.disclosure_status || '|' || coalesce(d.responsible_person,'') || '|' || coalesce(d.artefact,''), 'sha256'), 'hex') as recomputed
+      encode(digest(d.prev_hash || '|' || d.asset_id || '|' || to_char(d.decided_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+        || '|' || d.reviewer || '|' || d.decision
+        || '|' || coalesce(d.reason,'') || '|' || d.disclosure_status || '|' || coalesce(d.responsible_person,'') || '|' || coalesce(d.artefact,''), 'sha256'), 'hex') as h_v2,
+      encode(digest(d.prev_hash || '|' || d.asset_id || '|' || d.decided_at::text
+        || '|' || d.reviewer || '|' || d.decision
+        || '|' || coalesce(d.reason,'') || '|' || d.disclosure_status || '|' || coalesce(d.responsible_person,'') || '|' || coalesce(d.artefact,''), 'sha256'), 'hex') as h_v1
     from decisions d)
-  select seq, (hash = recomputed and prev_hash = coalesce(expected_prev, 'genesis')) as ok from c order by seq
+  select seq,
+         ((hash = h_v2 or hash = h_v1) and prev_hash = coalesce(expected_prev, 'genesis')) as ok,
+         case when hash = h_v2 then 'v2' when hash = h_v1 then 'v1' else 'none' end as alg
+  from c order by seq
 $$;

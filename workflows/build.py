@@ -25,6 +25,9 @@ KOKORO_URL = "http://host.docker.internal:8880/tts"
 MEDIA_LABEL_URL = "http://kit-media-label:8881/label"   # ffmpeg label service in its own container; if unreachable, images fall back to Edit Image, media to "disclosure at publication"
 # Postgres credential imported by reload.sh from secrets/postgres-credential.json (id is fixed so the JSON can reference it)
 PG = {"postgres": {"id": "KitPostgresCred01", "name": "kit-db"}}
+# Header-auth credential for the auditor's page, imported by reload.sh/update.sh from secrets/audit-auth-credential.json.
+# The page lists every asset waiting at the gate, its model and its prompt — it is not public.
+AUDIT_AUTH = {"httpHeaderAuth": {"id": "KitAuditAuthCred", "name": "kit-audit-token"}}
 GATE_MODE = os.environ.get("GATE_MODE", "form")   # "form": Wait node with a form (works everywhere, no credentials) · "slack": post to a thread, poll it, reviewer identity from Slack. Set GATE_MODE=slack in .env
 SLACK_CHANNEL = "#ai-act-gate"
 SLACK = {"slackApi": {"id": "yqaUQ2SkfGomOHLf", "name": "Slack_pipeline_approval"}}   # created by hand in the editor; id is instance-local
@@ -377,7 +380,7 @@ const m = $('Resolve decision').first().json;
 return [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,
                   responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,
                   labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: 'assets/' + m.id + ' (Postgres)',
-                  audit_view: 'http://localhost:5678/webhook/audit' } }];
+                  audit_view: 'GET /webhook/audit (header auth)' } }];
 """
 
 
@@ -535,15 +538,16 @@ LEDGER_SQL = ("select (select coalesce(json_agg(a order by a.created_at desc), '
               "(select hash from decisions order by seq desc limit 1) as chain_head")
 RENDER_JS = (HERE / "audit_render.js").read_text()
 audit_nodes = [
-    node("Audit request (GET)", "n8n-nodes-base.webhook", 2, {"path": "audit", "httpMethod": "GET", "responseMode": "responseNode", "options": {}},
-         0, 300, webhookId="a1b2c3d4-0004-4000-8000-aiactaudit001"),
+    node("Audit request (GET)", "n8n-nodes-base.webhook", 2,
+         {"path": "audit", "httpMethod": "GET", "responseMode": "responseNode", "authentication": "headerAuth", "options": {}},
+         0, 300, webhookId="a1b2c3d4-0004-4000-8000-aiactaudit001", credentials=AUDIT_AUTH),
     pg("Read the ledger", LEDGER_SQL, "={{ [] }}", 240, 300),
     node("Render audit view", "n8n-nodes-base.code", 2, {"jsCode": RENDER_JS.strip()}, 480, 300),
     node("Respond HTML", "n8n-nodes-base.respondToWebhook", 1.1, {
         "respondWith": "text", "responseBody": "={{ $json.html }}",
         "options": {"responseHeaders": {"entries": [{"name": "Content-Type", "value": "text/html; charset=utf-8"}]}}}, 720, 300),
     node("What this is", "n8n-nodes-base.stickyNote", 1, {"width": 900, "height": 100, "content":
-        "## Audit view — what an auditor reads instead of the pipeline\nAwaiting a human (gate links) · AI-systems registry with path analysis (Art. 4) · synthetic media & deepfakes (Art. 50(2), 50(4)) · generated public text (Art. 50(4) §2) · approval log (Art. 14, Art. 12 voluntary). Read from the Postgres ledger; the approval log is append-only and hash-chained, verified on every render."}, 0, 120),
+        "## Audit view — what an auditor reads instead of the pipeline\nAwaiting a human (gate links) · AI-systems registry with path analysis (Art. 4) · synthetic media & deepfakes (Art. 50(2), 50(4)) · generated public text (Art. 50(4) §2) · approval log (Art. 14, Art. 12 voluntary). Read from the Postgres ledger; the approval log is append-only and hash-chained, verified on every render. The page is behind header auth (credential \"kit-audit-token\") and shows no gate links: a decision is made from the link sent to the named reviewer, not from a page anyone can open."}, 0, 120),
 ]
 audit = {"id": AUDIT_ID, "name": "AI Act Transparency Kit — Audit view", "nodes": audit_nodes,
          "connections": wire(("Audit request (GET)", "Read the ledger"), ("Read the ledger", "Render audit view"), ("Render audit view", "Respond HTML")),

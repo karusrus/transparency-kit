@@ -4,8 +4,10 @@
 set -e
 cd "$(dirname "$0")"
 [ -f .env ] || { echo "KIT_DB_PASSWORD=$(openssl rand -hex 16)" > .env; }
+grep -q "^AUDIT_TOKEN=" .env || echo "AUDIT_TOKEN=$(openssl rand -hex 24)" >> .env
 . ./.env
 export GATE_MODE
+[ -f secrets/audit-auth-credential.json ] || { mkdir -p secrets; printf '[{"id":"KitAuditAuthCred","name":"kit-audit-token","type":"httpHeaderAuth","data":{"name":"X-Audit-Token","value":"%s"}}]\n' "$AUDIT_TOKEN" > secrets/audit-auth-credential.json; }
 [ -f secrets/postgres-credential.json ] || { mkdir -p secrets; printf '[{"id":"KitPostgresCred01","name":"kit-db","type":"postgres","data":{"host":"kit-db","database":"kit","user":"kit","password":"%s","port":5432,"ssl":"disable","allowUnauthorizedCerts":false}}]\n' "$KIT_DB_PASSWORD" > secrets/postgres-credential.json; }
 python3 workflows/build.py
 docker rm -f n8n kit-db >/dev/null 2>&1 || true
@@ -27,8 +29,11 @@ docker run -d --name n8n --network kit-net -p 5678:5678 --add-host host.docker.i
   n8nio/n8n:latest >/dev/null
 sleep 16
 docker exec n8n n8n import:credentials --input=/secrets/postgres-credential.json | tail -1
+docker exec n8n n8n import:credentials --input=/secrets/audit-auth-credential.json | tail -1
 for f in transparency-kit audit-view sample-line sample-50-3 sample-chatbot host-line; do docker exec n8n n8n import:workflow --input=/workflows/$f.json | tail -1; done
 for id in AiActTransparenc AiActAuditView00 RecyclingVoices1; do docker exec n8n n8n publish:workflow --id=$id >/dev/null; done
 docker restart n8n >/dev/null
 sleep 22
-for u in form/ai-act-intake form/notice webhook/audit; do printf '%s ' "$u"; curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:5678/$u"; done
+for u in form/ai-act-intake form/notice; do printf '%s ' "$u"; curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:5678/$u"; done
+printf 'webhook/audit without token '; curl -s -o /dev/null -w '%{http_code} (expect 403)\n' http://localhost:5678/webhook/audit
+printf 'webhook/audit with token    '; curl -s -o /dev/null -w '%{http_code} (expect 200)\n' -H "X-Audit-Token: $AUDIT_TOKEN" http://localhost:5678/webhook/audit

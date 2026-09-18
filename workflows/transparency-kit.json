@@ -3,7 +3,7 @@
   "name": "AI Act Transparency Kit",
   "nodes": [
     {
-      "id": "43786b14-dde9-4887-b76a-2da3f8024cc2",
+      "id": "4520e8ec-c923-4c00-b122-a085bab6e807",
       "name": "Asset produced",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -163,7 +163,7 @@
       "webhookId": "a1b2c3d4-0001-4000-8000-aiactintake01"
     },
     {
-      "id": "e73223c1-b7f9-40b7-923f-4bca3e4163ba",
+      "id": "e918177c-d854-4a63-abb1-aa349ec8b6d5",
       "name": "Called by another workflow",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
@@ -176,7 +176,7 @@
       }
     },
     {
-      "id": "81cef236-e034-44ac-8c35-3660c692a075",
+      "id": "447778f3-d5c2-4d8c-844c-e0fb8561866f",
       "name": "Prompt hash",
       "type": "n8n-nodes-base.crypto",
       "typeVersion": 1,
@@ -192,7 +192,7 @@
       }
     },
     {
-      "id": "61951344-b20a-46bc-9aa1-d117957cd7b3",
+      "id": "206f67f7-3db0-4914-b092-e8a41cd88d69",
       "name": "Classify (Art. 50)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -205,7 +205,7 @@
       }
     },
     {
-      "id": "2b1fed6b-a156-4348-90f3-b5bcb1edfb78",
+      "id": "1b4a618c-bf60-4e24-b02c-2d6cf62269d9",
       "name": "Is text?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -223,7 +223,7 @@
           },
           "conditions": [
             {
-              "id": "b8d8677d-9e95-4683-bbc6-92e70ebe0cb3",
+              "id": "c769e65e-356b-498e-97e6-1bfa77c88df9",
               "leftValue": "={{ $json.asset_type }}",
               "rightValue": "text",
               "operator": {
@@ -238,7 +238,7 @@
       }
     },
     {
-      "id": "1bfc1f19-05fc-49db-9c10-4d6de5c22742",
+      "id": "7b701a29-79fc-4c99-8541-c1f42d6ce14d",
       "name": "Text disclosure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -251,7 +251,7 @@
       }
     },
     {
-      "id": "6d3b0984-001e-4f29-88a4-e41591eb0811",
+      "id": "1e281203-1423-413c-8833-bc0c49005cef",
       "name": "Save incoming file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -267,7 +267,7 @@
       }
     },
     {
-      "id": "ca4742f3-a4c5-4430-bef7-7248f74e9a85",
+      "id": "cf001b56-25c1-4c05-a192-b20bb6feb306",
       "name": "Image?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -285,7 +285,7 @@
           },
           "conditions": [
             {
-              "id": "e3105fc8-573a-4bcf-bdfa-a4221cdec230",
+              "id": "0c36fdce-cd46-4faa-94b7-6eef265dcc9b",
               "leftValue": "={{ $('Classify (Art. 50)').first().json.asset_type }}",
               "rightValue": "image",
               "operator": {
@@ -300,7 +300,7 @@
       }
     },
     {
-      "id": "fca58f9c-3c17-46f5-9c2b-655f498b5734",
+      "id": "2a1d112c-d892-4e09-a5ad-e90a12c0affa",
       "name": "Label image (Edit Image)",
       "type": "n8n-nodes-base.editImage",
       "typeVersion": 1.1,
@@ -322,7 +322,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "3850808c-c0aa-40b9-b81b-60ed5aa5cb68",
+      "id": "1541be9e-cebc-4bd9-b8a3-562ebdaefe1b",
       "name": "Label media (service)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -349,7 +349,7 @@
       "onError": "continueErrorOutput"
     },
     {
-      "id": "d038a83e-9720-46d8-925a-3a676c83e4bd",
+      "id": "2e9a32fc-2da7-4aa6-9c0b-ef9b6a4c3fcb",
       "name": "Write labelled file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -365,7 +365,7 @@
       }
     },
     {
-      "id": "ed822c68-0e0b-4e5c-b7ed-568a7d0267aa",
+      "id": "a59c283d-907c-44f2-b383-9c8bd95d25ed",
       "name": "Burned in",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -377,7 +377,7 @@
         "assignments": {
           "assignments": [
             {
-              "id": "d7394eea-9cea-4468-b783-60ed39beb404",
+              "id": "3661b442-c61c-4c7a-a2b0-d82e41952a57",
               "name": "burned_in",
               "value": true,
               "type": "boolean"
@@ -388,7 +388,7 @@
       }
     },
     {
-      "id": "1a4b00a8-f700-4298-9359-d9db152f0bc0",
+      "id": "0cca065a-20f2-4466-8e82-97cba0a86121",
       "name": "No burn-in",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -400,13 +400,13 @@
         "assignments": {
           "assignments": [
             {
-              "id": "3555facd-e6bb-4f6a-b391-e096be9bb3f5",
+              "id": "31c71b3c-c574-4edf-8f43-39c1ef0ded1d",
               "name": "burned_in",
               "value": false,
               "type": "boolean"
             },
             {
-              "id": "1f300e2c-9579-49b5-a7bf-33560ac62d75",
+              "id": "90427a9b-8d91-498a-9306-0f67478def82",
               "name": "label_note",
               "value": "={{ 'No burnt-in label: ' + ($('Classify (Art. 50)').first().json.asset_type === 'audio' ? 'audio carries the disclosure in metadata and at publication' : 'the media-label service was not reachable; disclosure goes with the file at publication') }}",
               "type": "string"
@@ -417,7 +417,7 @@
       }
     },
     {
-      "id": "607500fb-c0c2-4a3b-9d87-93407a7c489b",
+      "id": "d3d0e98c-109e-41cf-b7f5-f3ed4254e31b",
       "name": "Build manifest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -430,7 +430,7 @@
       }
     },
     {
-      "id": "ae10de7a-80c9-4bfb-b1fe-9446ffb88c13",
+      "id": "65cdbd23-be06-4118-9dd6-40faf9daa34f",
       "name": "Store asset",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -453,7 +453,7 @@
       }
     },
     {
-      "id": "79296c96-5c0f-41c5-91ca-d98c328f2d58",
+      "id": "814e5859-f608-4811-afda-c3f106afc28f",
       "name": "Notify reviewer (Slack)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
@@ -478,7 +478,7 @@
       "notes": "Disabled until a Slack credential is attached (the editor refuses to publish a node without one). Enable it, pick the channel; swap for Gmail or Telegram if that is where your reviewers live. Without a credential the node is skipped and the link still shows on the audit view."
     },
     {
-      "id": "4b63d7dd-b3b3-41f5-ae43-783e76413fcc",
+      "id": "ae1e96c0-222c-4ac2-94a5-8eb68c9b82f4",
       "name": "Review & approve",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -531,7 +531,7 @@
       "webhookId": "a1b2c3d4-0002-4000-8000-aiactgate0001"
     },
     {
-      "id": "2157043d-8de5-47d6-ad29-9765af352cb7",
+      "id": "0a30aa3e-7cce-42fd-be7e-f40f77683692",
       "name": "Resolve decision",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -544,7 +544,7 @@
       }
     },
     {
-      "id": "7bed0b93-283a-4a92-84ae-7b8ce6ac0476",
+      "id": "b0372ce2-4712-4bd5-9012-ad7261227dce",
       "name": "Record decision",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -567,7 +567,7 @@
       }
     },
     {
-      "id": "83bfe2e8-5584-4ae6-be59-989f5b82e9df",
+      "id": "5f9d808d-940b-4bf2-985f-c4bf0833a5f3",
       "name": "Read assets",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -590,7 +590,7 @@
       }
     },
     {
-      "id": "ce791304-4978-48e4-982f-81ca5191fe1c",
+      "id": "5c87d44f-4147-46fc-9fac-8056700b338c",
       "name": "Read all workflows",
       "type": "n8n-nodes-base.n8n",
       "typeVersion": 1,
@@ -614,7 +614,7 @@
       }
     },
     {
-      "id": "c4fe3113-68fd-4c11-8d69-a0cb11071da8",
+      "id": "02c6e076-57dc-4619-9bd4-9cdbcb504f7d",
       "name": "Registry rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -627,7 +627,7 @@
       }
     },
     {
-      "id": "806b4766-3b55-4395-aa09-1bc4d26d8ad1",
+      "id": "0235feba-7656-477e-80f2-8210d1dc97bd",
       "name": "Snapshot registry",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
@@ -650,7 +650,7 @@
       }
     },
     {
-      "id": "4b123cdc-b8a0-488f-bc7a-f1bf3402fcd4",
+      "id": "fed8cfad-c091-4f1a-92d8-2977d2651211",
       "name": "Return to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -659,11 +659,11 @@
         300
       ],
       "parameters": {
-        "jsCode": "// What a calling workflow gets back, one item per asset.\nconst m = $('Resolve decision').first().json;\nreturn [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,\n                  responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,\n                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: 'assets/' + m.id + ' (Postgres)',\n                  audit_view: 'http://localhost:5678/webhook/audit' } }];"
+        "jsCode": "// What a calling workflow gets back, one item per asset.\nconst m = $('Resolve decision').first().json;\nreturn [{ json: { id: m.id, approved: m.status === 'approved', status: m.status, disclosure_status: m.disclosure_status,\n                  responsible_person: m.responsible_person, reviewer: m.reviewer, disclosure_sentence: m.disclosure_sentence,\n                  labelled_path: m.labelled_path, disclosed_text: m.disclosed_text || null, manifest: 'assets/' + m.id + ' (Postgres)',\n                  audit_view: 'GET /webhook/audit (header auth)' } }];"
       }
     },
     {
-      "id": "16d2c04e-3446-43df-82e2-cdc389437d46",
+      "id": "4b3835f1-4bd6-4702-846a-f6488794c306",
       "name": "How it works",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,

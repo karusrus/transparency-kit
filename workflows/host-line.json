@@ -3,7 +3,7 @@
   "name": "Recycling notice · three voices",
   "nodes": [
     {
-      "id": "0f0eefc6-f994-49a6-a794-3c7c2488aa98",
+      "id": "d4bc1a15-e137-4087-a29d-261c027447ff",
       "name": "Notice text",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
@@ -34,7 +34,7 @@
       "webhookId": "a1b2c3d4-0201-4000-8000-hostnotice001"
     },
     {
-      "id": "03c556dd-289d-4fbf-a995-c3d54b77c633",
+      "id": "01495e5a-03aa-4a99-9259-69ac8ea59698",
       "name": "Three voices",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -47,7 +47,7 @@
       }
     },
     {
-      "id": "d133a7e9-4a3d-4047-9630-f7173a99d0e0",
+      "id": "db76e752-76a2-4e5e-92eb-3e8bb8ea2fbd",
       "name": "Kokoro TTS (local)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -73,7 +73,7 @@
       }
     },
     {
-      "id": "74ef00d2-36fb-42d1-b1ff-e2e28e18aec7",
+      "id": "466471f3-c34a-4530-84de-edae76030c65",
       "name": "Attach fields",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -86,7 +86,7 @@
       }
     },
     {
-      "id": "b03d81fb-4663-4b6c-845f-126c215888d0",
+      "id": "b2aa5c26-dcf6-4cc3-a7a6-f2faf5954b00",
       "name": "One voice at a time",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
@@ -100,7 +100,7 @@
       }
     },
     {
-      "id": "61b9f904-631e-40e8-a4a6-6361a8cd517d",
+      "id": "e7249ccd-80d9-4059-aba9-9147467f14d1",
       "name": "AI Act gate",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
@@ -121,7 +121,7 @@
       }
     },
     {
-      "id": "67bd16a7-09a9-4820-892e-468ecc396db8",
+      "id": "1b4ead97-eeab-495d-b651-2756bb63086f",
       "name": "Human approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
@@ -139,7 +139,7 @@
           },
           "conditions": [
             {
-              "id": "c02589c8-ed0b-4065-bccc-2ca58c3cb7c5",
+              "id": "3bdab5df-8cb5-488d-b00e-5f0847009c9e",
               "leftValue": "={{ $json.approved }}",
               "rightValue": "",
               "operator": {
@@ -155,7 +155,7 @@
       }
     },
     {
-      "id": "23c66aa7-196c-45bd-859d-6ebe986b31d8",
+      "id": "ad7b30e6-204b-4fd3-8fe4-343d87995698",
       "name": "Prepare publish",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -168,7 +168,7 @@
       }
     },
     {
-      "id": "d82b45f2-7890-43d9-aa6d-8624ea05382e",
+      "id": "cc6a8498-c21a-44d9-ba6b-2b7a3d33c78a",
       "name": "Read approved file",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -185,7 +185,7 @@
       }
     },
     {
-      "id": "9d4c4c7f-3645-413e-965a-11e97e58e57c",
+      "id": "ca2ddb7c-cd5e-420d-be7c-c980ded9297f",
       "name": "Publish to site [exit]",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
@@ -201,7 +201,7 @@
       }
     },
     {
-      "id": "a957d6c6-1d04-49c8-86ff-962e731eaeb0",
+      "id": "b108cc22-e1bb-44e1-ac8e-354f00618f48",
       "name": "Returned, not published",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
@@ -212,7 +212,7 @@
       "parameters": {}
     },
     {
-      "id": "5e514ab2-ec2d-4a90-9a0d-de29417397ac",
+      "id": "a409fb71-b682-45c8-940f-3627b6653c77",
       "name": "What this line is",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,

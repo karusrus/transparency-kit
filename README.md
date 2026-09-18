@@ -5,7 +5,7 @@ Importable n8n workflows that make EU AI Act transparency a property of the prod
 The EU AI Act's transparency duties for deployers apply from 2 August 2026. This kit is the preparation, built ahead of the date: the obligations turned into a property of the production line before anyone asks for a report. The habit comes from work as AI Expert on Horizon Europe projects with GDSI, where an AI component ships only under the programme's mandatory ethics and data-governance requirements — governance there is a condition of funding, not a policy document. The same discipline, applied to a marketing line.
 
 - **AI Act Transparency Kit** — a module any line calls with *Execute Sub-workflow* (or its own intake form): classification under Article 50 → label (ffmpeg service) and provenance manifest → **human approval gate** (a form, or a Slack thread) → approval log → **AI-systems registry of the whole n8n instance with path analysis**: from every node that calls a model, every path forward to a node that reaches people, and what stands in between. Returns `approved`, `disclosure_status`, `labelled_path`, `disclosed_text` to the caller.
-- **Audit view** — `GET /webhook/audit`: assets awaiting a human (with gate links), the registry, synthetic media, generated text, the approval log. Read from the Postgres ledger; the approval log is append-only and hash-chained, and the chain is verified on every render.
+- **Audit view** — `GET /webhook/audit`, behind header auth: assets awaiting a human, the registry, synthetic media, generated text, the approval log. Read from the Postgres ledger; the approval log is append-only and hash-chained, and the chain is verified on every render. The page is a read-only record and carries no gate links — a decision is made from the link delivered to the named reviewer, not from a page anyone can open.
 - **Recycling notice · three voices** — a real line with the kit as a module: text → Kokoro-82M (local TTS, three stock voices) → AI Act gate → publish only what a human approved.
 - **Sample: social post drafter** — a marketing line without any gate, so the registry has something to flag.
 
@@ -31,7 +31,8 @@ Every asset stops at the gate. The reviewer sees the category, the obligations, 
 Everything the auditor reads lives in Postgres (`db/schema.sql`): `assets` (one row per asset, the manifest as jsonb), `decisions` and `registry_snapshots`. Two rules are enforced by the database itself, not by the workflow:
 
 - **`decisions` is append-only.** A trigger refuses `UPDATE` and `DELETE`, even from the owner role.
-- **Every decision is hash-chained.** A `BEFORE INSERT` trigger computes `hash = sha256(prev_hash | asset | time | reviewer | decision | reason | status | responsible | artefact)`, so the application never chooses its own hash. `verify_chain()` recomputes the whole chain; the audit view runs it on every render and prints *chain verified* or the first broken row.
+- **Every decision is hash-chained.** A `BEFORE INSERT` trigger computes `hash = sha256(prev_hash | asset | time | reviewer | decision | reason | status | responsible | artefact)`, so the application never chooses its own hash. The timestamp enters as `to_char(decided_at at time zone 'UTC', …)`, not `::text`: the text form of a `timestamptz` follows the session's TimeZone and DateStyle, so an auditor checking from another zone used to see the whole chain as broken. `verify_chain()` recomputes the chain and reports which preimage format matched — `v2` (current) or `v1` (ledgers written before 18 Sep 2026, which stay zone-dependent). The audit view runs it on every render and prints *chain verified* or the first broken row.
+- **Refusals are tested, not asserted.** `sh db/test-chain.sh` builds a throwaway database next to the real one and checks the claims: UPDATE, DELETE and TRUNCATE all refused; a row tampered with after the trigger is disabled is caught by `verify_chain()`; the verdict is identical in UTC, Los Angeles and Tokyo.
 - The registry is stored as a snapshot per run: history, not a file that gets overwritten.
 
 Only media files (incoming and labelled) stay on disk under `data/`.
@@ -76,6 +77,18 @@ The Act does not regulate links between nodes; it regulates what reaches people.
 
 Each row carries its evidence: the chain of nodes, e.g. `Draft post with GPT → Voice-over (ElevenLabs) → Publish to LinkedIn — no disclosure, no human gate on this path`. What the graph cannot know stays a human declaration: whether a real person is depicted, whether a text informs the public, whether a Slack channel is internal.
 
+## Who can open what
+
+The auditor's page lists every asset waiting at the gate, with its model, operator and prompt, so it is not public:
+the webhook uses n8n header auth against the credential `kit-audit-token`. `reload.sh` generates `AUDIT_TOKEN` into
+`.env` and the credential into `secrets/audit-auth-credential.json` (both git-ignored) and imports it. Approval never
+happens from this page — the gate link goes to the named reviewer over Slack or the returned form URL, so the ledger
+records a decision by a person, not by whoever had the page open.
+
+Still open, and named rather than hidden: the workflow connects as the database owner, so an operator with that
+credential can drop the immutability trigger (the test above does exactly that to prove the chain still catches the
+edit). A separate application role without DDL rights, and an external anchor for the chain head, are the next step.
+
 ## The blocks an auditor reads
 
 | # | Block | Article | Filled from |
@@ -101,7 +114,8 @@ git clone https://github.com/karusrus/transparency-kit && cd transparency-kit
 docker compose up -d                          # Postgres + label service + stock n8n; the init job imports and publishes the six workflows before n8n starts
 open http://localhost:5678                    # create the n8n owner account (once)
 open http://localhost:5678/form/ai-act-intake # send the first asset through the gate
-open http://localhost:5678/webhook/audit      # the auditor's page, filled from the ledger
+curl -H "X-Audit-Token: $AUDIT_TOKEN" \\
+     http://localhost:5678/webhook/audit       # the auditor's page, filled from the ledger (token is generated into .env)
 ```
 
 `docker compose down -v` removes everything. Set `KIT_DB_PASSWORD` in `.env` for anything beyond a laptop demo.
